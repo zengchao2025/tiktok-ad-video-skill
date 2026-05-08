@@ -220,4 +220,3 @@ tiktok-ad-video-skill/
 <p align="center">
   <sub>由 <a href="https://github.com/qq547820639">qq547820639</a> 维护 · 最后更新于 2026-05-08</sub>
 </p>
-```
