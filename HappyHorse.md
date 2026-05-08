@@ -1,11 +1,11 @@
-# HappyHorse CreativeOS v2.0 — 系统规范
+# HappyHorse CreativeOS v2.0.1 — 系统规范定稿
 
 ---
 
 ## 系统定位
 
 ```text
-HappyHorse CreativeOS v2.0
+HappyHorse CreativeOS v2.0.1
 = 创意编译器（Creative Compiler）
 + 渲染评测器（Render Bench）
 + 标注系统（Annotation Console）
@@ -28,7 +28,7 @@ HappyHorse CreativeOS v2.0
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HappyHorse CreativeOS v2.0                    │
+│                 HappyHorse CreativeOS v2.0.1                     │
 ├─────────────────────────────────────────────────────────────────┤
 │  Layer 1: Kernel（精算内核）                                      │
 │    规则 / 评分 / 门控 / 风险 / 奖励 / 惩罚 / 修复 / 回滚           │
@@ -86,9 +86,9 @@ HappyHorse 核心亮点与评分映射：
 
 HappyHorse 已知限制：
 
-- 不擅长精确色彩控制（铁律 #12：不用"画面变成黑白"）
-- 不擅长精确时序控制（铁律 #13：不用"时间倒流"）
-- 不支持分屏效果（铁律 #14：不用"分屏"）
+- 不擅长精确色彩控制：避免使用"画面变成黑白"等强色彩控制表达。
+- 不擅长精确时序控制：避免使用"时间倒流"等复杂时间表达。
+- 不支持稳定分屏效果：避免使用"分屏"等画面结构要求。
 
 ---
 
@@ -105,6 +105,15 @@ Prompt = 场景 + 主体 + 运动 + 音频
 - **运动**：描述主体动作、镜头运动、产品互动、情绪变化、结尾 CTA。
 - **音频**：描述环境音、动作声、音乐、对白或口播。不得依赖后期配音。
 
+四元公式适用于所有模式，但各模式对四元的填写要求不同：
+
+| 模式 | 场景 | 主体 | 运动 | 音频 |
+|:--|:--|:--|:--|:--|
+| T2V | 必填 | 必填 | 必填 | 必填 |
+| I2V | 沿用首帧图像 | 沿用首帧图像 | 必填 | 必填 |
+| R2V | 必填 | 必填 + @图片指代 | 必填 | 必填 |
+| V2V | 由原视频提供 | 由原视频提供 | 编辑意图（改什么+保留什么） | 必填（描述音频变化或保留） |
+
 ---
 
 ## K3. 模式路由
@@ -116,13 +125,19 @@ Prompt = 场景 + 主体 + 运动 + 音频
 | 无图片、无视频 | T2V 文生视频 | 场景+主体+运动+音频（全部必填） |
 | 有 1 张图片 | I2V 首帧图生视频 | 运动+音频（场景/主体由图片提供） |
 | 有多张图片 | R2V 多图参考生视频 | 场景+主体+运动+音频+@图片指代 |
-| 有视频 | V2V 视频编辑 | 编辑意图（改什么+保留什么） |
+| 有视频 | V2V 视频编辑 | 编辑意图（改什么+保留什么+禁止误改什么） |
 
 I2V 核心原则：重点描述"动起来之后发生什么"，无需重复描述图片中已有的静态内容。
 
 R2V 指代规则：在提示词中通过 @图片1、@图片2、@图片3 等方式准确指代素材。图片按顺序上传，顺序有意义。
 
-V2V 核心原则：明确指出"改什么"和"保留什么"。描述应侧重于"需要改变什么"而非重复描述视频原有内容。
+V2V 核心原则：明确指出"改什么"和"保留什么"。描述应侧重于"需要改变什么"而非重复描述视频原有内容。四元公式在 V2V 模式中简化为：
+
+```
+Prompt = 保留内容 + 修改内容 + 运动变化 + 音频变化 + 禁止误改项
+```
+
+禁止误改项用于明确告知模型哪些内容不应被修改（如人物面部、产品外观、特定场景元素），避免模型在编辑过程中误改原视频中需要保留的主体、场景或产品。
 
 ---
 
@@ -544,17 +559,19 @@ RiskLoad 高   → R_risk = 0.78
 
 ### Step 7：线性惩罚 P_penalty
 
+P_penalty 各分项为非负惩罚值，P_penalty = 所有触发项之和：
+
 ```
-广告腔明显：-2
-感官词堆砌：-3
-过度解释：-2
-CTA 生硬：-2
-低自然度：-3
-违反 ShowDontTell 但未修复：-5
-音频与画面不匹配：-3
-市场文化风险未处理：-3
-运镜规则被破坏：-3
-CriticPass ≤2：-3
+广告腔明显：2
+感官词堆砌：3
+过度解释：2
+CTA 生硬：2
+低自然度：3
+违反 ShowDontTell 但未修复：5
+音频与画面不匹配：3
+市场文化风险未处理：3
+运镜规则被破坏：3
+CriticPass ≤2：3
 ```
 
 ### Step 8：最终公式
@@ -581,7 +598,7 @@ StructureScore = clamp(
 | 美妆/穿搭/食品 | +0.03 | +0.02 | -0.02 | -0.03 |
 | 数码/工具/软件/设备 | -0.03 | +0.04 | +0.03 | -0.04 |
 | 家居/生活方式 | +0.02 | +0.02 | 0 | -0.04 |
-| 高客单价产品 | -0.08 | +0.04 | +0.02 | +0.02 |
+| 高客单价产品 | -0.05 | +0.03 | +0.01 | +0.01 |
 | 低客单价冲动消费 | +0.05 | -0.02 | -0.05 | +0.02 |
 
 调整后四域权重总和必须重新归一化为 1.00。
@@ -604,11 +621,15 @@ KVS 包括：
 7. 是否存在复杂物理风险
 8. 是否存在强口型同步风险
 
-PRC 高：主体 ≤2，场景 ≤2，动作清晰，光线明确，无精准文字，无复杂物理，无复杂群像，无长对白强同步要求。
+KVS 每项按 高 / 中 / 低 标注。
 
-PRC 中：有 3 个主体或 3 个场景，有轻微复杂运镜，有少量对白，有轻微物理异常，仍可生成但需检查。
+PRC 高：KVS 8 项中低置信项 ≤ 1，主体 ≤2，场景 ≤2，动作清晰，光线明确，无精准文字，无复杂物理，无复杂群像，无长对白强同步要求。
 
-PRC 低：多角色群像，多场景快速切换，精准文字要求，复杂时间控制，强口型同步，过多物理异常，过度依赖模型精确执行。
+PRC 中：KVS 8 项中低置信项 = 2，有 3 个主体或 3 个场景，有轻微复杂运镜，有少量对白，有轻微物理异常，仍可生成但需检查。
+
+PRC 低：KVS 8 项中低置信项 ≥ 3，多角色群像，多场景快速切换，精准文字要求，复杂时间控制，强口型同步，过多物理异常，过度依赖模型精确执行。
+
+PRC 低且无兜底方案：KVS 8 项中 ≥3 项为低置信，且无法通过减少主体、减少场景、降低文字/口型/物理复杂度修复。
 
 外部输出：PRC：高 / 中 / 低 + 一句原因。
 
@@ -646,7 +667,7 @@ LongFlatPenalty：
 
 每项通过记 ✓，未通过记 ✗。
 
-若通过项 ≤2：触发低自然度风险，P_penalty 至少 -3，必须尝试修复一次。
+若通过项 ≤2：触发低自然度风险，P_penalty 至少 3，必须尝试修复一次。
 
 ---
 
@@ -707,12 +728,16 @@ HU 低：±3 分 / HU 中：±6 分 / HU 高：±10 分
 
 只有当用户输入出现以下信号时激活：系列 / 连载 / EP / Episode / 第几集 / campaign / 多条视频 / 连续投放。
 
-SC 检查：
-1. 角色一致性
-2. 世界观一致性
-3. 视觉风格一致性
-4. CTA 节奏一致性
-5. 与前后集的情绪衔接
+SC 五项评估维度：
+1. 角色一致性（CharacterConsistency）
+2. 世界观一致性（WorldConsistency）
+3. 视觉风格一致性（VisualStyleConsistency）
+4. CTA 节奏一致性（CTAConsistency）
+5. 与前后集的情绪衔接（EmotionContinuity）
+
+每项评分 0-5。
+
+SCScore = CharacterConsistency、WorldConsistency、VisualStyleConsistency、CTAConsistency、EmotionContinuity 五项平均值，范围 0-5。
 
 SC 修复：
 - 角色不一致：恢复固定身份、服装、动作习惯
@@ -748,9 +773,9 @@ SC 修复：
 NoPostRiskLoad =
   (0.20×N1 + 0.15×N2 + 0.10×N3 + 0.15×N4
  + 0.10×N5 + 0.10×N6 + 0.10×N7 + 0.10×N8) / 10
-
-Floor to 0.10。
 ```
+
+NoPostRiskLoad 按 0.10 步长四舍五入到最近档位。若计算结果恰好为 0.00，则保留 0.00，不强制提升至 0.10。
 
 ### BaseNoPostGate 查表
 
@@ -760,9 +785,9 @@ Floor to 0.10。
 0.20 → 0.86    0.70 → 0.59
 0.30 → 0.80    0.80 → 0.55
 0.40 → 0.74    0.90 → 0.51
-
-Floor to 0.10。
 ```
+
+BaseNoPostGate 不再额外四舍五入；它直接使用 NoPostRiskLoad 查表得到的对应值。
 
 ### Cap Rules（18 条）
 
@@ -892,14 +917,14 @@ PostReadyScore：
 1. Q1 ≤ 2
 2. Q2 ≤ 2
 3. Q4 ≤ 2
-4. D1 = 🔴（不可修复技术缺陷）
-5. D2 = 🔴（产品未出现或严重突兀）
-6. D7 = 🔴（严重合规风险）
-7. SS < 65
-8. 字数超出平台限制（>2500 汉字或>5000 英文字符）
-9. FatalRed ≥ 1
-10. EAD ≤ 0.07（LongFlatPenalty 后）
-11. PRC < 0.50 且无兜底方案
+4. CreativeScore < 65
+5. 字数超出平台限制（>2500 汉字或 >5000 英文字符）
+6. 存在不可修复的合规风险（由 NaturalnessCheck 或人工审查标记）
+7. 产品完全未出现或严重突兀（Q2#1 = 0 且 Q2#4 = 0）
+8. EAD = 低 且 LongFlatPenalty 已触发（存在 ≥8 秒连续同一情绪）
+9. PRC = 低 且无兜底方案（KVS 逐项中 ≥3 项为低置信且无法通过简化主体、场景、文字、口型或物理复杂度修复）
+10. NoPostGate = 不通过 且用户明确要求无需后期
+11. 存在不可修复的模型执行风险（Error Taxonomy 中 E3/E4/E8 标记且 ReworkNeeded = Major）
 
 Q8 < 3 不硬淘汰，改为强制 Repair/Enhance。
 
@@ -911,8 +936,8 @@ Q8 < 3 不硬淘汰，改为强制 Repair/Enhance。
 
 | # | 指标 | 数据来源 | 触发条件 | 校准动作 |
 |:--|:--|:--|:--|:--|
-| 1 | Q1→3s停留率 | 投放数据 | Q1≥4 但 3s<35% | 校准 Q1#1-#3，收紧声音/冲突/动词判定 |
-| 2 | Q8→3s停留率 | 投放数据 | Q8≥4 但 3s<35% | 校准 Q8#1，检查 Hook 是否真有强情绪冲击 |
+| 1 | Q1→ThreeSecondViewRate | 投放数据 | Q1≥4 但 ThreeSecondViewRate<35% | 校准 Q1#1-#3，收紧声音/冲突/动词判定 |
+| 2 | Q8→ThreeSecondViewRate | 投放数据 | Q8≥4 但 ThreeSecondViewRate<35% | 校准 Q8#1，检查 Hook 是否真有强情绪冲击 |
 | 3 | Q8→复播率 | 投放数据 | Q8≥4 但复播<15% | 校准 Q8#4，检查结尾是否真有反预期 |
 | 4 | Q8→完播率 | 投放数据 | Q8≥4 但完播低 | 校准 Q8#2/#5，检查情绪段和前后情绪变化 |
 | 5 | EAD→完播率曲线 | 投放数据 | EAD 高但中段掉点 | 定位最长平铺段，加情绪切换 |
@@ -1047,7 +1072,7 @@ NoPostGate / PostReady / CF / HU / Overall
 - 是否与运镜冲突
 
 【9. 校准记录】
-- 3 秒留存假设
+- ThreeSecondViewRate 假设
 - 完播率假设
 - 互动率假设
 - 点击率假设
@@ -1112,9 +1137,11 @@ NoPostGate / PostReady / CF / HU / Overall
 | VisualUsability | High / Medium / Low | 画面是否可直接使用 |
 | ProductVisibility | Clear / Partial / Unclear | 产品是否清楚出现 |
 | MotionAccuracy | High / Medium / Low | 动作是否符合 Prompt |
-| FaceBodyStability | High / Medium / Low / NA | 人物脸部和身体是否稳定 |
-| TextFailure | None / Minor / Severe | 是否出现错误文字、乱码 |
-| AudioMatch | High / Medium / Low / NoAudio | 音频是否匹配画面 |
+| FaceBodyStabilityScore | 0 / 1 / 2 | 人物脸部和身体稳定性（0=明显异常/1=轻微异常/2=稳定） |
+| FaceBodyApplicable | Yes / No | 是否涉及人物 |
+| TextFailureSeverity | None / Minor / Severe | 是否出现错误文字、乱码 |
+| AudioMatchScore | 0 / 1 / 2 | 音频匹配度（0=不匹配/1=基本匹配/2=自然匹配） |
+| AudioApplicable | Yes / No | 是否涉及音频 |
 | PRC_Actual | High / Medium / Low | 实际渲染置信度 |
 | ReworkNeeded | None / Minor / Major | 是否需要人工返工 |
 | FailureReason | 见 Error Taxonomy | 失败原因 |
@@ -1154,7 +1181,7 @@ NoPostGate / PostReady / CF / HU / Overall
 | Platform | TikTok / Reels / Shorts / 小红书 / 其他 |
 | Spend | 测试预算 |
 | Impressions | 曝光量 |
-| 3sViewRate | 3 秒停留率 |
+| ThreeSecondViewRate | 3 秒停留率 |
 | CompletionRate | 完播率 |
 | RewatchRate | 复播率 |
 | LikeRate | 点赞率 |
@@ -1163,6 +1190,10 @@ NoPostGate / PostReady / CF / HU / Overall
 | CTR | 点击率 |
 | CVR | 转化率（如有） |
 | CPA / ROAS / ROI | 如有 |
+| RetentionCurveLink | 完整留存曲线数据链接或文件路径 |
+| MajorDropoffSecond | 主要掉点发生的秒数 |
+| MidpointRetentionRate | 中点（50% 时长处）留存率 |
+| DropoffNote | 人工记录的掉点模式描述（MVP 可选） |
 | AudienceSignal | 评论情绪、收藏意图、购买意图、质疑点 |
 
 ---
@@ -1180,11 +1211,15 @@ NoPostGate / PostReady / CF / HU / Overall
 7. Reject ≤ 15%。
 8. PRC_Pre 与 PRC_Actual 一致率 ≥ 70%。
 9. NoPostGate_Pre 与 NoPostActual 一致率 ≥ 70%。
-10. Q1 高分视频的 3 秒停留率显著高于 Q1 低分视频。
-11. Q8 高分视频的完播率或复播率显著高于 Q8 低分视频。
+10. Q1 高分组（Q1 ≥ 4）的 ThreeSecondViewRate 至少高于低分组（Q1 ≤ 2）5 个百分点，或相对提升 ≥ 15%。
+11. Q8 高分组（Q8 ≥ 4）的 CompletionRate 或 RewatchRate 至少高于低分组（Q8 ≤ 2）5 个百分点，或相对提升 ≥ 15%。
 12. 至少完成一轮 Calibration Action。
 13. 所有失败样本都有 FailureReason。
 14. 所有 Kernel 级修改都有数据依据。
+
+若高分组或低分组样本数 < 3，则该轮不判断该维度区分度，只记录为 Insufficient Sample，待下一轮累计样本后再评估。
+
+样本 ≥ 100 条后，引入统计检验或回归校准。
 
 未达到以上条件时，只能称为：结构化创意生成与专家先验评分系统。
 
@@ -1218,9 +1253,9 @@ NoPostGate / PostReady / CF / HU / Overall
 | ProductVisibility | 产品清晰可见 | 产品部分可见 | 产品不清楚 |
 | MotionAccuracy | 动作符合 Prompt | 部分符合 | 明显不符合 |
 | VisualQuality | 可投放级画面 | 可用但一般 | 不可用 |
-| FaceBodyStability | 稳定 | 轻微异常 | 明显异常（NA=不涉及） |
-| AudioMatch | 音频自然匹配 | 基本匹配 | 不匹配（NA=无音频） |
-| TextFailure | 无文字错误 | 轻微错误 | 严重错误 |
+| FaceBodyStabilityScore | 2 = 稳定 | 1 = 轻微异常 | 0 = 明显异常（不适用时标注 FaceBodyApplicable = No） |
+| AudioMatchScore | 2 = 音频自然匹配 | 1 = 基本匹配 | 0 = 不匹配（不适用时标注 AudioApplicable = No） |
+| TextQualityScore | 2 = 无文字错误 | 1 = 轻微错误 | 0 = 严重错误 |
 
 | 维度 | 3 分 | 2 分 | 1 分 | 0 分 |
 |:--|:--|:--|:--|:--|
@@ -1237,9 +1272,9 @@ NoPostGate / PostReady / CF / HU / Overall
 |:--|:--|:--|
 | E1 | 产品不清楚 | Q2 / ProductVisibility |
 | E2 | 动作不符合 Prompt | Q5 / MotionAccuracy |
-| E3 | 人脸或身体异常 | FaceBodyStability |
+| E3 | 人脸或身体异常 | FaceBodyStabilityScore |
 | E4 | 文字乱码或错误文字 | N1 / 铁律#5 |
-| E5 | 音频不自然 | AudioMatch |
+| E5 | 音频不自然 | AudioMatchScore |
 | E6 | 口型不同步 | N6 |
 | E7 | 场景混乱 | Q5#2 / Q7#4 |
 | E8 | 运镜失败 | 运镜指令体系 |
@@ -1261,13 +1296,13 @@ NoPostGate / PostReady / CF / HU / Overall
 |:--|:--|:--|
 | PRC_Pre | RenderSuccess / VisualQuality / MotionAccuracy | PRC_Pre高但实际低 |
 | NoPostGate_Pre | NoPostActual | 通过但实际低 |
-| Q1_Pre | 3sViewRate | ≥4 但 3s<35% |
+| Q1_Pre | ThreeSecondViewRate | ≥4 但 ThreeSecondViewRate<35% |
 | Q8_Pre | CompletionRate / RewatchRate | ≥4 但完播/复播低 |
-| EAD_Pre | CompletionRate 曲线 | 高但中段掉点 |
+| EAD_Pre | CompletionRate 曲线 / MajorDropoffSecond | 高但中段掉点 |
 | Q2_Pre | ProductVisibility / CTR | 高但产品不清 |
 | Q6_Pre | CTR / CVR | 高但转化低 |
 | VEL 记录 | VisualQuality | 完整但质量低 |
-| Audio 描述 | AudioMatch | 完整但不匹配 |
+| Audio 描述 | AudioMatchScore | 完整但不匹配 |
 
 ---
 
@@ -1278,13 +1313,16 @@ NoPostGate / PostReady / CF / HU / Overall
 | 1 | PRC_Pre高但RenderSuccess低 | PRC / Q7 / KVS | 提高复杂物理、多主体、多场景、长对白风险权重 |
 | 2 | PRC_Pre高但ProductVisibility低 | Q2 / PRC | 提高产品可见性要求，降低"产品暗示"得分 |
 | 3 | NoPostGate通过但NoPostActual低 | NoPostRiskLoad / Cap Rules | 提高 N1、N4、N6、N8 权重，收紧 Cap Rules |
-| 4 | Q1_Pre高但3sViewRate低 | Q1#1-#3 | 收紧声音事件、视觉冲突、动作动词判定 |
+| 4 | Q1_Pre高但ThreeSecondViewRate低 | Q1#1-#3 | 收紧声音事件、视觉冲突、动作动词判定 |
 | 5 | Q8_Pre高但CompletionRate低 | Q8#2 / Q8#5 / EAD | 收紧有效情绪段和前后情绪变化判定 |
 | 6 | Q8_Pre高但RewatchRate低 | Q8#4 / Q4#5 | 收紧结尾反预期和复播点判定 |
 | 7 | Q6_Pre高但CTR低 | 标题/评论/Bio/商品卡 | 重写投放资产，不改 Prompt 内核 |
 | 8 | CTR高但CVR低 | 产品承诺/商品卡/落地页 | 检查卖点是否过度承诺 |
 | 9 | VEL完整但VisualQuality低 | VEL 词库 | 减少抽象增强词，优先材质光影和角色生命 |
-| 10 | AudioMatch低 | 音频描述 | 减少长对白，改为环境音、动作声、短对白 |
+| 10 | AudioMatchScore低 | 音频描述 | 减少长对白，改为环境音、动作声、短对白 |
+| 11 | VEL 完整但 VisualQuality 无提升 | VEL 词库 | 减少 A/D 类抽象增强词，优先 C 类材质光影和 B 类角色生命 |
+| 12 | 在同一轮测试中，AudioApplicable = Yes 的视频样本 AudioMatchScore 平均分 < 1.3 | 音频描述规则 | 减少长对白，改为环境音、动作声、短对白；降低口型同步要求 |
+| 13 | SCScore ≥ 4 但 SeriesFollowRate < 20% | SC 评估标准 | 校准角色一致性、世界观一致性、视觉风格一致性和集间悬念判定 |
 
 ---
 
@@ -1359,6 +1397,8 @@ NoPostGate / PostReady / CF / HU / Overall
 
 ### RenderResult Table
 
+RenderResult Table 记录聚合后的最终标注结果。当只有一名标注者时，最终分数直接采用该标注；当有两名及以上标注者时，记录复审后确认的最终分数。
+
 | 字段 | 类型 | 说明 |
 |:--|:--|:--|
 | VideoID | 文本 | 视频唯一标识 |
@@ -1367,16 +1407,18 @@ NoPostGate / PostReady / CF / HU / Overall
 | VisualQuality | 数值 | 2/1/0 |
 | ProductVisibility | 数值 | 2/1/0 |
 | MotionAccuracy | 数值 | 2/1/0 |
-| FaceBodyStability | 数值 | 2/1/0/NA |
-| AudioMatch | 数值 | 2/1/0/NA |
-| TextFailure | 数值 | 2/1/0 |
+| FaceBodyStabilityScore | 数值 | 0/1/2 |
+| FaceBodyApplicable | 文本 | Yes/No |
+| AudioMatchScore | 数值 | 0/1/2 |
+| AudioApplicable | 文本 | Yes/No |
+| TextQualityScore | 数值 | 2/1/0 |
 | PRC_Actual | 文本 | High/Medium/Low |
 | NoPostActual | 数值 | 3/2/1/0 |
 | ReworkNeeded | 文本 | None/Minor/Major |
 | FailureReason_Main | 文本 | E1-E15 |
 | FailureReason_Secondary | 文本 | E1-E15 |
 | HumanOverall | 数值 | 3/2/1/0 |
-| AnnotatorID | 文本 | 标注者 |
+| AnnotatorID | 文本 | 主标注者 |
 | AnnotationDate | 日期 | 标注日期 |
 
 ### AdResult Table
@@ -1387,7 +1429,7 @@ NoPostGate / PostReady / CF / HU / Overall
 | Platform | 文本 | 平台 |
 | Spend | 数值 | 预算 |
 | Impressions | 数值 | 曝光 |
-| 3sViewRate | 数值 | 3 秒停留率 |
+| ThreeSecondViewRate | 数值 | 3 秒停留率 |
 | CompletionRate | 数值 | 完播率 |
 | RewatchRate | 数值 | 复播率 |
 | LikeRate | 数值 | 点赞率 |
@@ -1398,6 +1440,10 @@ NoPostGate / PostReady / CF / HU / Overall
 | CPA | 数值 | 单次转化成本 |
 | ROAS | 数值 | 广告支出回报 |
 | ROI | 数值 | 投资回报率 |
+| RetentionCurveLink | 文本 | 完整留存曲线数据链接或文件路径 |
+| MajorDropoffSecond | 数值 | 主要掉点发生的秒数 |
+| MidpointRetentionRate | 数值 | 中点（50% 时长处）留存率 |
+| DropoffNote | 长文本 | 人工记录的掉点模式描述（MVP 可选） |
 | AudienceSignal | 长文本 | 评论情绪/收藏意图/购买意图/质疑点 |
 | TestDate | 日期 | 测试日期 |
 
@@ -1418,6 +1464,60 @@ NoPostGate / PostReady / CF / HU / Overall
 | RollbackCondition | 长文本 | 回滚条件 |
 | Owner | 文本 | 负责人 |
 | Date | 日期 | 修改日期 |
+
+### VEL Table（可选扩展表）
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| PromptID | 文本 | 关联 Prompt |
+| VEL_Type | 文本 | A/B/C/D |
+| VEL_Content | 文本 | 具体增强词 |
+| VEL_Position | 文本 | 植入位置（第几句） |
+| VEL_RenderResult | 文本 | 有效/无效/堆叠/冲突 |
+| CreatedDate | 日期 | 创建日期 |
+
+### Annotation Table（可选扩展表）
+
+Annotation Table 记录每位标注者的独立评分，用于支持多标注者独立打分和分歧计算。
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| AnnotationID | 文本 | 标注唯一标识 |
+| VideoID | 文本 | 关联视频 |
+| AnnotatorID | 文本 | 标注者 |
+| RenderSuccess | 数值 | 2/1/0 |
+| VisualQuality | 数值 | 2/1/0 |
+| ProductVisibility | 数值 | 2/1/0 |
+| MotionAccuracy | 数值 | 2/1/0 |
+| FaceBodyStabilityScore | 数值 | 0/1/2 |
+| FaceBodyApplicable | 文本 | Yes/No |
+| AudioMatchScore | 数值 | 0/1/2 |
+| AudioApplicable | 文本 | Yes/No |
+| TextQualityScore | 数值 | 2/1/0 |
+| NoPostActual | 数值 | 3/2/1/0 |
+| HumanOverall | 数值 | 3/2/1/0 |
+| Notes | 长文本 | 标注备注 |
+| AnnotationDate | 日期 | 标注日期 |
+
+### Series Table（可选扩展表）
+
+仅在内容为系列/连载/EP/campaign 时使用。
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| SeriesID | 文本 | 系列唯一标识 |
+| SeriesName | 文本 | 系列名称 |
+| EpisodeNumber | 数值 | 集数 |
+| VideoID | 文本 | 关联视频 |
+| CharacterConsistency | 数值 | 0-5 |
+| WorldConsistency | 数值 | 0-5 |
+| VisualStyleConsistency | 数值 | 0-5 |
+| CTAConsistency | 数值 | 0-5 |
+| EmotionContinuity | 数值 | 0-5 |
+| SCScore | 数值 | 五项平均值，0-5 |
+| SeriesFollowRate | 数值 | 如有数据 |
+| Notes | 长文本 | 备注 |
+| CreatedDate | 日期 | 创建日期 |
 
 ---
 
@@ -1450,7 +1550,7 @@ NoPostGate / PostReady / CF / HU / Overall
 
 ## O4. 版本治理
 
-版本命名：v2.0-r1 / v2.0-r2 / v2.0-r3 ...
+版本命名：v2.0.1 / v2.0.1-r1 / v2.0.1-r2 ...
 
 每个版本必须记录 8 项：修改日期、修改原因、修改模块、修改前规则、修改后规则、触发数据、预期改善、是否需要回滚。
 
@@ -1475,7 +1575,7 @@ NoPostGate / PostReady / CF / HU / Overall
 6. Reject 比例
 7. PRC_Pre / PRC_Actual 一致率
 8. NoPostGate_Pre / NoPostActual 一致率
-9. Q1 高低分组 3sViewRate 差异
+9. Q1 高低分组 ThreeSecondViewRate 差异
 10. Q8 高低分组 CompletionRate / RewatchRate 差异
 11. 最常见失败类型 Top 5
 12. 需要校准模块 Top 5
@@ -1517,17 +1617,18 @@ NoPostGate / PostReady / CF / HU / Overall
 | v1.7-Final | 精算编译器：三层架构 + Q8 严格判定 + 正反例 + NoPostRiskLoad 恢复 + Cap Rules 连续值 + PostReadyScore + PS-4 完整阈值 + 14 步 14/14 |
 | v1.8-Eval | 实验协议：Render Test + NoPost Audit + Small Batch Ad Test + Calibration Sheet + Release Gate |
 | v1.9-Bench | 评测工作台：Test Set Design + Annotation Rubric + Error Taxonomy + Metric Mapping + Calibration Matrix + Calibration Action Levels + Version Governance + Dashboard |
-| **v2.0** | **创意操作系统：7 模块 + 6 张数据库表 + 4 角色 + 4 级发布 + 自动校准规则 + 版本治理** |
+| v2.0 | 创意操作系统：7 模块 + 6 张数据库表 + 4 角色 + Level 0-4 发布等级 + 自动校准规则 + 版本治理 |
+| **v2.0.1** | **系统规范定稿：修正铁律编号错位、P_penalty 正负号、动态权重冲突、K22 未定义变量、四元公式模式分叉；新增 VEL/Annotation/Series 三张可选扩展表；统一字段命名（ThreeSecondViewRate / TextQualityScore / FaceBodyStabilityScore / AudioMatchScore）；操作化 Release Gate 判定标准；补充 VEL/音频/SC 校准规则；明确 SCScore 定义、AudioMatchScore 统计范围、Q1/Q8 样本量兜底、NoPostRiskLoad 离散化口径、RenderResult 与 Annotation 职责边界、V2V 禁止误改项。** |
 
 ---
 
 ## A3. 一句话定位
 
 ```
-HappyHorse CreativeOS v2.0
+HappyHorse CreativeOS v2.0.1
 = 把产品卖点编译成可生成、可评分、可审计、可回测、可归因、可校准、可持续进化的 AI 视频广告系统。
 ```
 
 ---
 
-**HappyHorse CreativeOS v2.0 — 系统规范定稿。**
+**HappyHorse CreativeOS v2.0.1 — 系统规范定稿。**
