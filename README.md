@@ -1,71 +1,46 @@
-# 🎬 tiktok-ad-video-skill
+# tiktok-ad-video-skill
 
 **面向 TikTok 广告投放场景的 Prompt 自动生成系统，集成创意搜索、结构评分、NoPost 直发优化与双门控审查机制。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/Seedance-v3.5-blue)](./Seedance.md)
-[![Version](https://img.shields.io/badge/HappyHorse-v1.0-green)](./HappyHorse.md)
+[![Version](https://img.shields.io/badge/HappyHorse%20CreativeOS-v2.1%20MVP-blue)](./HappyHorse%20CreativeOS%20v2.1-MVP%20%E2%80%94%20%E8%A1%A8%E6%A0%BC%E8%90%BD%E5%9C%B0%E7%89%88)
+[![Platform](https://img.shields.io/badge/Platform-DeepSeek%20%7C%20General%20LLM-purple)]()
 
-本仓库包含两套独立且完整的 TikTok 视频 Prompt 生成系统：**Seedance**（面向 Seedance 2.0 平台）与 **HappyHorse**（面向 HappyHorse 1.0 平台）。二者均能自动生成可直接投放的视频 Prompt、标题文案、标签、评论、Bio，并提供结构质量评分、情绪影响分析、渲染置信度评估以及合规性审查报告，帮助增长团队高效、规模化地生产低后期依赖的广告素材。
+本仓库包含 HappyHorse CreativeOS 的完整实现体系，由两层架构组成：
+
+- **理论内核**：《HappyHorse CreativeOS v2.0.1 系统规范定稿》—— 负责 Prompt 生成、Q1–Q8 评分、CreativeScore、PRC、EAD、NoPostGate、PostReady、VEL、ShowDontTell、审计与修复。
+- **执行手册**：《HappyHorse CreativeOS v2.1-MVP 表格落地版》—— 负责 9 张表、18 个核心视图、Pilot 执行指南、Decision Dashboard、CalibrationLog 与 Pilot Run Report。
+
+系统可自动生成可直接投放的视频 Prompt、标题文案、标签、评论、Bio，并提供结构质量评分、情绪影响分析、渲染置信度评估以及合规性审查报告，帮助增长团队高效、规模化地生产低后期依赖的广告素材。
 
 ---
 
-## 📋 目录
+## 目录
 
-- [项目概述](#项目概述)
-- [系统对比](#系统对比)
-- [关键交付物](#关键交付物)
+- [系统架构](#系统架构)
 - [核心概念](#核心概念)
-  - [视觉增强层 (VEL)](#视觉增强层-vel)
-  - [双门控审查机制](#双门控审查机制)
-  - [评分体系](#评分体系)
 - [仓库结构](#仓库结构)
-- [快速开始](#快速开始)
-- [使用示例](#使用示例)
+- [快速开始：总控 Prompt](#快速开始总控-prompt)
+- [分阶段工作流](#分阶段工作流)
+- [防错规则](#防错规则)
 - [常见问题 (FAQ)](#常见问题-faq)
-- [贡献指南](#贡献指南)
-- [许可证](#许可证)
 - [声明](#声明)
 
 ---
 
-## 项目概述
+## 系统架构
 
-`tiktok-ad-video-skill` 是一套 **Prompt 工程系统**，旨在将 TikTok 广告创意标准化、流程化。用户只需输入核心创意、产品卖点及趋势参考，系统便会自动输出一整套投放素材包，涵盖视频 Prompt、多版本标题、社交元数据以及多维度的质量评估报告。
+HappyHorse CreativeOS 采用 **双层架构**，严格区分为理论与执行：
 
-系统设计遵循以下原则：
-
-- **低后期依赖**：所有输出均以“无需后期即可发布”（NoPost）为直发标准；
-- **质量可量化**：通过专家先验权重对创意与结构质量进行数值化评分；
-- **合规可追溯**：内置“双门控”审查，并提供风险说明与有限终止证明；
-- **视觉增强**：统一的视觉增强层（VEL）在保证评分稳定的前提下提升画面表现力。
-
----
-
-## 系统对比
-
-| 特性 | Seedance | HappyHorse |
+| 层级 | 文档 | 职责 |
 | :--- | :--- | :--- |
-| **定位** | 面向 Seedance 2.0 平台的轻量级、快速投放管线 | 面向 HappyHorse 1.0 平台，适配更复杂的多模态生产管线 |
-| **版本** | v3.5 (Minor Release) | v1.0 (Major Release) |
-| **核心组成** | 创意质量审查器 + 结构质量审查器 + 视觉增强编译器 + 投放交付编译器 | 创意质量审查器 + 结构质量审查器 + 视觉增强编译器 + 投放交付编译器 |
-| **关键能力** | · 创意质量审查<br>· 结构质量评分 (SS ± HU)<br>· NoPost 直发优化<br>· 双门控审查 | · 多模态生成 (文/图/视频编辑)<br>· 音视频联合生成<br>· 四元 Prompt 公式 (场景+主体+运动+音频)<br>· 双门控审查 |
-| **词数限制** | 100-162 词 (合格区间) | ≤2500 汉字 / 5000 英文字符 |
-| **Vision Enhancement Layer (VEL)** | 支持，每 Prompt 植入 3-4 个增强词 | 支持，每 Prompt 植入 3-4 个增强词 |
+| **第一层：理论内核** | `HappyHorse CreativeOS v2.0.1 — 系统规范定稿` | Prompt 生成、Q1–Q8 评分、CreativeScore、PRC、EAD、NoPostGate、PostReady、VEL 植入、ShowDontTell 检查、低分诊断、候选 Winner 选择、风险声明、审计检阅 |
+| **第二层：执行手册** | `HappyHorse CreativeOS v2.1-MVP — 表格落地版` | 9 张表、18 个核心视图、Pilot 执行指南、Decision Dashboard、CalibrationLog、Pilot Run Report |
 
-**选择建议**：若追求快速投放且内容相对简单，优先使用 Seedance；若需要多模态输入、复杂场景编辑或音频联动，则选择 HappyHorse。
-
----
-
-## 关键交付物
-
-每套系统在一次完整运行后，会生成一份结构化的投放素材包，包含但不限于：
-
-1. **核心 Prompt**：可直接复制至对应 AI 平台的视频生成提示词。
-2. **投放文案 A/B/C**：提供反差、POV、情绪等不同风格的标题文案。
-3. **社交元数据**：包含 12-16 个标签、1 条置顶评论、1 条 Bio CTA。
-4. **质量评估报告**：涵盖结构质量评分 (SS ± HU)、情绪影响快照 (Q8)、情绪弧密度 (EAD)、渲染置信度 (PRC) 等。
-5. **风险与证明**：提供“双门控”审查结果、有限终止证明及 VEL 植入记录。
+**核心原则**：
+- v2.0.1 负责判断「怎么生成和评分」；
+- v2.1-MVP 负责规定「怎么记录和执行」；
+- DeepSeek（或任意 LLM）每次只执行当前 P 步骤，不允许自由发挥。
 
 ---
 
@@ -73,13 +48,12 @@
 
 ### 视觉增强层 (VEL)
 
-一个统一的增强词库，分为 **物理真实、角色生命、材质光影、大气粒子** 四大类。在生成 Prompt 时，系统会自动遵循 **分散、不堆叠** 的植入规则（每 Prompt 3-4 个词，每句最多 1 个后缀），以提升画面的视觉表现力，而不会对评分产生负面影响。
+一个统一的增强词库，分为 **物理真实、角色生命、材质光影、大气粒子** 四大类。在生成 Prompt 时，系统会自动遵循 **分散、不堆叠** 的植入规则（每 Prompt 3–4 个词，每句最多 1 个后缀），以提升画面的视觉表现力，而不会对评分产生负面影响。
 
 ### 双门控审查机制
 
 模拟生产管线的质量关卡：
-
-1. **NoPostGate**：检查内容是否满足“无需后期制作即可发布”的直发标准。
+1. **NoPostGate**：检查内容是否满足「无需后期制作即可发布」的直发标准。
 2. **PostReady**：评估作品是否已达到可投放的专业质量。
 
 只有通过双门控审查的内容，才会被视为可交付。
@@ -92,101 +66,307 @@
 
 ## 仓库结构
 
-```text
+```
 tiktok-ad-video-skill/
-├── README.md                # 本文件
-├── Seedance.md              # Seedance 2.0 完整系统提示词 (v3.5)
-└── HappyHorse.md            # HappyHorse 1.0 完整系统提示词 (v1.0)
+├── README.md                                              # 本文件
+├── HappyHorse CreativeOS v2.0.1 — 系统规范定稿             # 理论内核（第一层）
+├── HappyHorse CreativeOS v2.1-MVP — 表格落地版             # 执行手册（第二层）
+└── Seedance.md                                            # Seedance 2.0 独立系统 (v3.5)
 ```
 
-两个 `.md` 文件均包含完整的 System Prompt，可直接作为大语言模型的系统指令使用。
-
 ---
 
-## 快速开始
+## 快速开始：总控 Prompt
 
-### 1. 准备输入
+### 首次打开 DeepSeek（或任意 LLM）时的推荐方式
 
-整理以下信息：
+**第一步：发送总控系统指令**
 
-- **核心创意**：视频要表达的核心概念或故事；
-- **产品/USP**：产品的核心卖点或差异化优势；
-- **TikTok 趋势参考**：可选的风格、音乐或热门话题参考。
+将以下内容作为 System Prompt 发送给 LLM：
 
-### 2. 选择系统
+```text
+你现在作为 HappyHorse CreativeOS 的执行代理工作。
 
-根据目标平台选择对应的系统文件：
+你有两份上位文档：
+1.《HappyHorse CreativeOS v2.0.1 系统规范定稿》：理论内核，用于 Prompt 生成、Q1-Q8 评分、CreativeScore、PRC、EAD、NoPostGate、PostReady、VEL、ShowDontTell、审计与修复。
+2.《HappyHorse CreativeOS v2.1-MVP 表格落地版》：执行手册，用于 9 张表、18 个核心视图、Pilot 执行指南、Decision Dashboard、CalibrationLog 与 Pilot Run Report。
 
-| 目标平台 | 系统文件 |
+工作原则：
+- 当前默认阶段是 v2.1-MVP Pilot Run。
+- 不再扩展理论模块。
+- 不修改 9 张表主干。
+- 不修改 18 个核心视图主干。
+- 所有评分是专家先验，不是投放效果预测。
+- 只有接入真实生成数据和投放数据并完成校准后，才允许讨论预测关系。
+- RenderResult 只记录聚合后的最终标注结果，第一手标注必须进入 Annotation Table。
+- Pilot 只有 9 条视频，只验证流程闭环，不满足 Level 1。
+- 输出必须能直接填写进表格、执行、追溯。
+
+请先读取我接下来粘贴的两份文档，建立上下文。
+读取后只回复：
+"已建立 HappyHorse CreativeOS 工作上下文。当前默认阶段：v2.1-MVP Pilot Run。"
+不要总结，不要扩展理论。
+```
+
+**第二步：按顺序粘贴两份文档**
+
+```text
+【文档 1】
+HappyHorse CreativeOS v2.0.1 系统规范定稿
+……
+```
+
+```text
+【文档 2】
+HappyHorse CreativeOS v2.1-MVP 表格落地版
+……
+```
+
+**第三步：发送当前任务**
+
+```text
+请基于以上两份文档，进入 v2.1-MVP Pilot Run。
+现在先执行 P-01 至 P-05：建表、建视图、配权限、选择 3 个产品、准备产品图。
+请输出可直接执行的操作清单和需要填写的表格内容模板。
+不要扩展理论，不要修改表结构。
+```
+
+### 文档投喂策略
+
+| 场景 | 建议 |
 | :--- | :--- |
-| Seedance 2.0 | `Seedance.md` |
-| HappyHorse 1.0 | `HappyHorse.md` |
+| 第一次对话 | 投喂 sys 级总指令 + v2.0.1 + v2.1-MVP 全文，建立上下文 |
+| 同一对话后续 | 只发当前任务 + 必要产品信息 |
+| 新开对话 | 重新投喂 sys 级总指令 + 两份文档（或至少相关章节） |
 
-### 3. 执行生成
-
-将对应 `.md` 文件的 **全部内容** 作为 System Prompt 提供给大语言模型（如 GPT-4、Claude 等），随后输入你的需求，即可获得完整的投放素材包。
-
-**示例调用流程**：
-
-1. 打开 `Seedance.md` 或 `HappyHorse.md`；
-2. 将全文复制到 LLM 的 System Prompt 输入框中；
-3. 在 User Prompt 中输入你的创意需求；
-4. 获取输出结果，按「投放版」或「完整版」格式择一使用。
+> **简单说：同一个长对话里，不要反复丢全文。新对话或上下文断了，再丢。**
 
 ---
 
-## 使用示例
+## 分阶段工作流
 
-### Seedance 示例 (摘要)
+### 第 1 步：启动上下文
 
-**输入需求**：
-> 推广一款防晒霜，目标用户为18-25岁女性，风格偏夏日轻快。
+发送总控 Prompt（见上方「快速开始」），让 LLM 读取两份文档并回复确认，避免一上来长篇复述。
 
-**系统输出（部分）**：
-- **Prompt**：包含 3 个 VEL 增强词、运镜指令的完整 Seedance Prompt (100-162 词)
-- **标题 A (反差型)**：这么暴晒还能白到发光？
-- **标题 B (POV型)**：POV：夏天出门前的最后一步
-- **标题 C (情绪型)**：这瓶防晒让我告别了夏日焦虑
-- **标签**：#summervibes #skincare #sunprotection … (共14个)
-- **结构评分**：SS 83 ± 5 (HU)
-- **双门控**：NoPostGate ✓ | PostReady ✓
+### 第 2 步：执行 P-01 至 P-05（建表与产品选择）
 
-### HappyHorse 示例 (摘要)
+```text
+现在执行 v2.1-MVP Pilot Run 的 P-01 至 P-05。
 
-**输入需求**：
-> 推广一款蓝牙耳机，需要文生视频模式，风格偏科技感。
+请输出：
+1. 建 9 张表的操作清单
+2. 建 18 个核心视图的操作清单
+3. 角色权限配置表
+4. 3 个 Pilot 产品选择标准
+5. Product Table 填写模板
+6. 产品素材文件夹命名规则
 
-**系统输出（部分）**：
-- **模式适配标记**：T2V
-- **Prompt**：融合场景+主体+运动+音频四元公式，含 3 个 VEL 增强词 (≤2500 汉字)
-- **多版本标题**：反差 / POV / 情绪型各一
-- **社交元数据**：14 个标签 + 置顶评论 + Bio CTA
-- **情绪弧密度**：EAD 2.8，附完整情绪时间线
-- **渲染置信度**：PRC 0.91
+不要生成 Prompt。
+不要修改表结构。
+不要扩展理论。
+```
+
+### 第 3 步：执行 P-06 至 P-12（Prompt 生成与评分）
+
+当你已经有 3 个产品后，发：
+
+```text
+现在执行 P-06 至 P-12。
+
+以下是 Product Table 的 3 条产品记录：
+【粘贴产品信息】
+
+请为每个产品生成 3 个候选：
+A_StrongHook
+B_EmotionReversal
+C_ProductFunction
+
+每个候选输出：
+1. Prompt Table 填写内容
+2. PreScore Table 填写内容
+3. VEL Table 填写内容
+4. Winner 选择理由，但 Pilot 阶段仍渲染全部 A/B/C
+
+必须调用 v2.0.1 评分内核。
+不要进入渲染标注阶段。
+```
+
+**v2.0.1 的典型调用场景**：
+
+只要任务涉及以下内容，就必须调用 v2.0.1 理论内核：
+
+- 生成 HappyHorse Prompt
+- 计算 Q1–Q8
+- 计算 CreativeScore
+- 判断 PRC / EAD / NoPostGate / PostReady
+- 做 ShowDontTell 检查
+- 做 VEL 植入
+- 做低分诊断
+- 做候选 Winner 选择
+- 做风险声明
+- 做审计检阅
+
+典型任务示例：
+
+```text
+请调用 v2.0.1 系统规范，基于以下产品信息生成 A/B/C 三个候选 Prompt。
+要求：
+1. 每个候选对应 A_StrongHook / B_EmotionReversal / C_ProductFunction。
+2. 每个候选都输出 Prompt、标题、标签、置顶评论、Bio CTA、商品卡文案。
+3. 每个候选都给出 Q1-Q8、CreativeScore、PRC、EAD、NoPostGate、PostReady、CF、HU。
+4. 评分必须声明为专家先验，不得写成投放预测。
+5. 不要修改 v2.0.1 规则。
+```
+
+### 第 4 步：执行 P-13 至 P-15（渲染提交）
+
+```text
+现在执行 P-13 至 P-15。
+
+以下是 9 条 Prompt：
+【粘贴 Prompt Table / PromptText】
+
+请输出：
+1. HappyHorse 渲染提交清单
+2. 每条 Prompt 的推荐画幅、时长、音频类型
+3. RenderResult 占位记录模板
+4. VideoID 命名规则
+5. VideoLink 填写要求
+
+注意：
+RenderResult 此阶段只填写 VideoID / PromptID / VideoLink / RenderSuccess。
+其他评分字段必须等 Annotation 独立标注后再聚合写入。
+```
+
+### 第 5 步：执行 P-16 至 P-20（标注阶段）
+
+```text
+现在执行 P-16 至 P-20：标注阶段。
+
+以下是 9 条视频的 VideoID 和 VideoLink：
+【粘贴视频链接】
+
+请输出：
+1. Annotation Table 独立标注表
+2. 每条视频的评分维度说明
+3. NoPost Audit 7 项附加检查模板
+4. 分歧检查规则
+5. RenderResult 聚合写入模板
+6. FailureReason E1-E15 归类表
+
+不要直接把 Annotation 跳过写入 RenderResult。
+```
+
+### 第 6 步：执行 P-21 至 P-24（投放测试）
+
+```text
+现在执行 P-21 至 P-24：投放测试阶段。
+
+以下是 RenderResult 聚合结果：
+【粘贴结果】
+
+请筛选可投放视频：
+HumanOverall ≥ 2 且 NoPostActual ≥ 2。
+
+请输出：
+1. 可投放视频列表
+2. 每条视频推荐投放平台
+3. AdResult Table 填写模板
+4. 需要记录的投放指标
+5. AudienceSignal 记录模板
+```
+
+### 第 7 步：执行 P-25 至 P-29（Dashboard 与校准）
+
+```text
+现在执行 P-25 至 P-29：Dashboard 与校准。
+
+以下是 Product / Prompt / PreScore / RenderResult / AdResult / CalibrationLog 当前数据：
+【粘贴数据】
+
+请输出：
+1. Decision Dashboard 15 项
+2. 失败类型 Top 5
+3. 需要校准模块 Top 5
+4. 是否进入下一发布等级
+5. CalibrationLog 写入内容
+6. 下一轮测试建议
+7. Pilot Run Report
+
+注意：
+Pilot 只有 9 条视频，不满足 Level 1 的 30 条样本要求。
+判断 Level 1 时必须记录为样本不足，待扩展。
+```
+
+---
+
+## 防错规则
+
+在 LLM（尤其是 DeepSeek）中使用本系统时，请注意以下最容易出错的地方：
+
+### 1. 防止擅自扩展理论
+
+遇到 LLM 开始说「我建议升级 v2.2 / v3.0」时，立刻打断：
+
+```text
+停止扩展理论。当前只执行 v2.1-MVP Pilot Run。不得新增模块。
+```
+
+### 2. 防止把评分说成预测
+
+强制 LLM 每次写：
+
+```text
+评分为专家先验，不是投放效果预测。
+```
+
+### 3. 防止跳过 Annotation 直接写 RenderResult
+
+这会破坏流程。必须明确：
+
+```text
+RenderResult 只记录聚合后的最终标注结果。
+第一手标注必须进入 Annotation Table。
+```
+
+### 4. 防止把 Pilot 当 Level 1
+
+必须提醒：
+
+```text
+Pilot 只有 9 条视频，不满足 Level 1 的 30 条样本要求。
+Pilot 只验证流程闭环。
+```
+
+### 5. 防止把 v2.1-MVP 当理论规范
+
+必须提醒：
+
+```text
+v2.0.1 是理论内核。
+v2.1-MVP 是执行手册。
+```
 
 ---
 
 ## 常见问题 (FAQ)
 
-<details>
-<summary><strong>Q: 这个系统能保证视频的投放效果吗？</strong></summary>
-<p>不能。本项目的评分权重基于专家先验，旨在提供创意与结构质量的参考，而非投放效果的预测。实际投放效果受平台算法、受众偏好等多重因素影响。</p>
-</details>
+**Q: 这个系统能保证视频的投放效果吗？**
 
-<details>
-<summary><strong>Q: VEL 增强词是否会影响评分？</strong></summary>
-<p>项目声明 VEL 增强词对评分的影响为中性至微幅正面，不会产生负面影响。</p>
-</details>
+不能。本项目的评分权重基于专家先验，旨在提供创意与结构质量的参考，而非投放效果的预测。实际投放效果受平台算法、受众偏好等多重因素影响。
 
-<details>
-<summary><strong>Q: 我可以同时使用 Seedance 和 HappyHorse 吗？</strong></summary>
-<p>可以。两个系统完全独立，可根据不同项目或平台需求灵活切换。</p>
-</details>
+**Q: VEL 增强词是否会影响评分？**
 
-<details>
-<summary><strong>Q: 如何贡献或提出修改建议？</strong></summary>
-<p>请参阅下方的贡献指南。</p>
-</details>
+项目声明 VEL 增强词对评分的影响为中性至微幅正面，不会产生负面影响。
+
+**Q: v2.0.1 和 v2.1-MVP 是什么关系？**
+
+v2.0.1 是理论内核，负责「怎么生成和评分」；v2.1-MVP 是执行手册，负责「怎么记录和执行」。两者配合使用，不可互相替代。
+
+**Q: 如何贡献或提出修改建议？**
+
+请参阅下方的贡献指南。
 
 ---
 
@@ -205,7 +385,7 @@ tiktok-ad-video-skill/
 
 ## 许可证
 
-本项目采用 [MIT License](https://opensource.org/licenses/MIT) 进行许可。详见仓库默认条款。
+本项目采用 [MIT License](https://opensource.org/licenses/MIT) 进行许可。
 
 ---
 
@@ -213,10 +393,13 @@ tiktok-ad-video-skill/
 
 - 本项目 **不是投放效果预测模型**，所有权重为专家先验，待数据校准；
 - VEL 增强词对评分的影响为中性至微幅正面；
-- 输出内容仅供创作参考，实际投放前请根据平台规则进行合规性审查。
+- 输出内容仅供创作参考，实际投放前请根据平台规则进行合规性审查；
+- Pilot 只有 9 条视频，只验证流程闭环，不满足 Level 1 的 30 条样本要求；
+- 所有评分均为专家先验，不是投放效果预测；
+- 不允许因为单条样本成功就宣称系统有效；
+- 不允许因为单条样本失败就修改 Kernel。
 
 ---
 
-<p align="center">
-  <sub>由 <a href="https://github.com/qq547820639">qq547820639</a> 维护 · 最后更新于 2026-05-08</sub>
-</p>
+由 [qq547820639](https://github.com/qq547820639) 维护 · 最后更新于 2026-05-08
+```
