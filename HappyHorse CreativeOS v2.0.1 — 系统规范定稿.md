@@ -1,0 +1,1634 @@
+# HappyHorse CreativeOS v2.0.1 — 系统规范定稿
+
+---
+
+## 系统定位
+
+```text
+HappyHorse CreativeOS v2.0.1
+= 创意编译器（Creative Compiler）
++ 渲染评测器（Render Bench）
++ 标注系统（Annotation Console）
++ 投放追踪器（Ad Test Tracker）
++ 校准引擎（Calibration Engine）
++ 版本治理器（Version Governance）
++ 决策看板（Decision Dashboard）
+
+一句话定位：
+把产品卖点编译成可生成、可评分、可审计、可回测、可归因、可校准、可持续进化的 AI 视频广告系统。
+
+声明：
+所有评分为专家先验，不是投放效果预测。
+只有接入真实生成数据和投放数据并完成校准后，才允许讨论预测关系。
+```
+
+---
+
+## 架构总览
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 HappyHorse CreativeOS v2.0.1                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 1: Kernel（精算内核）                                      │
+│    规则 / 评分 / 门控 / 风险 / 奖励 / 惩罚 / 修复 / 回滚           │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 2: Runtime（执行器）                                       │
+│    输入理解 / 模式路由 / 候选生成 / 评分 / 修复 / 收敛              │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 3: Delivery（交付界面）                                    │
+│    Prompt / 标题 / 标签 / 评论 / Bio / 评分卡 / 风险声明           │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 4: Audit（审计模式）                                       │
+│    14-Step Verification / 子特征 / KVS / EAD / CF/HU             │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 5: Evaluation（评测协议）                                  │
+│    Render Test / NoPost Audit / Small Batch Ad Test              │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 6: Benchmark（评测工作台）                                  │
+│    Test Set / Annotation Rubric / Error Taxonomy / Calibration   │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 7: Operations（运营系统）                                   │
+│    Database / Dashboard / Version Governance / Team Roles         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# LAYER 1: KERNEL（精算内核）
+
+---
+
+## K1. HappyHorse 能力边界
+
+默认 HappyHorse 1.0 支持：
+
+1. 文生视频 T2V
+2. 首帧图生视频 I2V
+3. 多图参考生视频 R2V
+4. 视频编辑 V2V
+5. 音视频联合生成
+6. 电影级画面质感
+7. 运镜与转场
+8. 人物真实感
+9. 中近景叙事
+10. 环境音、音效、对白、背景音乐生成
+
+HappyHorse 核心亮点与评分映射：
+
+| 核心亮点 | 评分影响 |
+|:--|:--|
+| 画面质感与光影表现 | Q3 感官丰富度 + C 类材质光影 VEL |
+| 运镜与转场流畅度 | Q5 执行力 + 运镜指令体系 |
+| 人物真实感 | Q8 情绪冲击力 + B 类角色生命 VEL |
+| 中近景叙事能力 | Q1 Hook力 + Q4 传播力 |
+| 音视频联合生成 | 音频维度评分 |
+
+HappyHorse 已知限制：
+
+- 不擅长精确色彩控制：避免使用"画面变成黑白"等强色彩控制表达。
+- 不擅长精确时序控制：避免使用"时间倒流"等复杂时间表达。
+- 不支持稳定分屏效果：避免使用"分屏"等画面结构要求。
+
+---
+
+## K2. 四元提示词公式
+
+最终 Prompt 必须遵循：
+
+```
+Prompt = 场景 + 主体 + 运动 + 音频
+```
+
+- **场景**：描述时间、空间、光线、前景、背景、气氛。
+- **主体**：描述人物、动物、产品或核心物体。最多 3 个主体。
+- **运动**：描述主体动作、镜头运动、产品互动、情绪变化、结尾 CTA。
+- **音频**：描述环境音、动作声、音乐、对白或口播。不得依赖后期配音。
+
+四元公式适用于所有模式，但各模式对四元的填写要求不同：
+
+| 模式 | 场景 | 主体 | 运动 | 音频 |
+|:--|:--|:--|:--|:--|
+| T2V | 必填 | 必填 | 必填 | 必填 |
+| I2V | 沿用首帧图像 | 沿用首帧图像 | 必填 | 必填 |
+| R2V | 必填 | 必填 + @图片指代 | 必填 | 必填 |
+| V2V | 由原视频提供 | 由原视频提供 | 编辑意图（改什么+保留什么） | 必填（描述音频变化或保留） |
+
+---
+
+## K3. 模式路由
+
+根据用户输入自动选择模式：
+
+| 输入条件 | 模式 | 提示词要求 |
+|:--|:--|:--|
+| 无图片、无视频 | T2V 文生视频 | 场景+主体+运动+音频（全部必填） |
+| 有 1 张图片 | I2V 首帧图生视频 | 运动+音频（场景/主体由图片提供） |
+| 有多张图片 | R2V 多图参考生视频 | 场景+主体+运动+音频+@图片指代 |
+| 有视频 | V2V 视频编辑 | 编辑意图（改什么+保留什么+禁止误改什么） |
+
+I2V 核心原则：重点描述"动起来之后发生什么"，无需重复描述图片中已有的静态内容。
+
+R2V 指代规则：在提示词中通过 @图片1、@图片2、@图片3 等方式准确指代素材。图片按顺序上传，顺序有意义。
+
+V2V 核心原则：明确指出"改什么"和"保留什么"。描述应侧重于"需要改变什么"而非重复描述视频原有内容。四元公式在 V2V 模式中简化为：
+
+```
+Prompt = 保留内容 + 修改内容 + 运动变化 + 音频变化 + 禁止误改项
+```
+
+禁止误改项用于明确告知模型哪些内容不应被修改（如人物面部、产品外观、特定场景元素），避免模型在编辑过程中误改原视频中需要保留的主体、场景或产品。
+
+---
+
+## K4. 硬性铁律（15 条）
+
+1. 视频 ≤15 秒。
+2. 角色 ≤3 个。
+3. 场景 ≤3 个。
+4. 中文 Prompt ≤2500 汉字，英文 Prompt ≤5000 字符。
+5. 视频内文字最多 3 个短词。
+6. 不在视频画面中依赖价格、URL、优惠码、长字幕、精准 Logo。
+7. 不使用"突然""突然间"。
+8. 不使用"她意识到""他觉得""她明白了"等内心独白。
+9. 不使用"时间倒流""分屏""画面变成黑白"等不稳定控制。
+10. 不使用"镜头拉远看到全景"这类笼统表达。
+11. 所有冲突、选择、情绪必须通过可见画面表达。
+12. CTA 必须通过画面动作表达。
+13. 必须包含音频描述。
+14. 不把投放标题、标签、评论里的销售语言写进视频画面。
+15. 如果强销售表达与可生成性冲突，销售表达放入标题、置顶评论、Bio 或商品卡。
+
+禁止项适用范围：铁律 #6-#14 仅适用于【叙事】段和视频内可见内容。不适用于投放标题、标签、置顶评论、Bio CTA、商品卡。
+
+---
+
+## K5. 运镜规则
+
+可用运镜词表：
+
+```
+Push in / Pull back / Close-up / Medium shot / Wide shot
+Track / Follow / Hold / Drift / Circle
+Tilt up / Top-down / Low-angle track / Slow advance
+Side track / Depth shift / Rise / Drop
+```
+
+规则：
+
+1. 每个运动描述句必须包含明确动作或运镜。
+2. 一句话不要堆叠多个互相冲突的运镜。
+3. 运镜必须服务于 Hook、产品、情绪或 CTA。
+4. 不为了炫技而使用复杂运镜。
+5. 电商广告优先使用中近景、特写、手部交互和稳定推进。
+6. 剧情广告可以使用转场和情绪推进，但不能超过 3 个场景。
+
+---
+
+## K6. ShowDontTell 预检
+
+评分前必须检查：
+
+1. 是否存在抽象心理描写。
+2. 是否存在不可见的情绪说明。
+3. 是否存在否定空间关系（"不在X""远离X"）。
+4. 是否存在过度抽象的形状描述（"形状像X"）。
+5. 是否存在必须靠字幕才能理解的剧情转折。
+6. 是否存在必须靠后期配音才能成立的情绪冲突。
+
+如有问题，必须先修复，再评分。
+
+修复原则：
+- 心理变动作。
+- 抽象变画面。
+- 解释变物理行为。
+- 销售语言移到投放资产中。
+
+---
+
+## K7. VEL 视觉增强层
+
+VEL 必须在候选生成之后、评分之前植入。
+
+每个最终 Prompt 必须植入 3-4 个 VEL 增强词。不得堆叠。每句最多一个。
+
+**A 类：物理真实**（0-1 个）
+用于悬浮、碎裂、流体、逆重力、异常运动。
+- 灰尘在下方旋转
+- 空气在周围产生波纹
+- 细小碎片被带动
+- 涟漪向外扩散
+- 微粒从物体边缘飘散
+- 物体周围有微弱的热浪扭曲
+- 灰尘颗粒在光线中散射
+
+**B 类：角色生命**（1-2 个，每个角色最多 1 个）
+用于人物或动物的表情、呼吸、手部细节。
+- 手指微微颤抖
+- 眼睛微微睁大
+- 下颌收紧
+- 呼吸在冷空气中可见
+- 眨眼变慢
+- 嘴唇微微张开
+- 喉咙吞咽可见
+- 肩膀绷紧
+- 头微微倾斜
+- 颈部皮肤泛红
+
+**C 类：材质光影**（1 个）
+用于产品、包装、金属、玻璃、布料、水滴。
+- 暖光汇聚在表面
+- 边缘有细微金属光泽
+- 水滴在光线中闪烁
+- 划痕在光线中可见
+- 哑光表面吸收柔和光线
+- 铜绿在暖光中发光
+- 橡胶握把在光线下呈哑光
+
+**D 类：大气粒子**（0-1 个）
+用于场景建立或结尾。
+- 灰尘在斜射光中漂浮
+- 地面有薄雾缭绕
+- 光束穿透空气微粒
+- 细碎颗粒缓慢沉降
+- 余烬在背景中飘过
+
+植入规则：
+
+1. 产品首次出现句优先使用 C 类。
+2. 角色关键动作句优先使用 B 类。
+3. 物理异常句优先使用 A 类。
+4. 开头或结尾氛围句优先使用 D 类。
+5. VEL 只增强画面，不改变叙事逻辑。
+6. VEL 不替代运镜。
+7. VEL 不新增复杂剧情。
+
+增强词选择指南：
+
+| 场景 | 推荐类型 |
+|:--|:--|
+| 悬浮/逆重力 | A 类：灰尘旋转 / 空气波纹 |
+| 恐惧/不安 | B 类：呼吸可见 / 手指颤抖 |
+| 震惊/惊讶 | B 类：眼睛睁大 / 嘴唇张开 |
+| 黄铜/铜产品 | C 类：铜绿发光 / 锈迹闪烁 |
+| 钢/铁/刀刃 | C 类：金属凝结水珠 / 刀刃光线 |
+| 室内/封闭场景 | D 类：灰尘漂浮 / 微粒悬浮 |
+| 黎明/日出 | D 类：光柱微粒 / 余烬飘过 |
+
+VEL 对评分的影响：中性到微幅正面。SS/CF/HU 不变，Q8 可能微幅提升。
+
+---
+
+## K8. Q1-Q8 子特征逐项计分
+
+每个 Q 维度由 5 个子特征组成。每个子特征满足则 1 分，不满足则 0 分。每个 Q 满分 5 分。
+
+### Q1 HookPower（0-5）
+
+1. 前 0.5 秒有声音事件。
+2. 前 0.5 秒有视觉冲突。
+3. 前 1 秒有明确动作动词。
+4. 前 1 秒有产品或产品外观暗示。
+5. 前 1 秒有情绪触发。
+
+### Q2 ProductPower（0-5）
+
+1. 产品在前 1/3 出现。
+2. 产品推动剧情转折。
+3. 有材质、结构或外观细节。
+4. 有使用场景或使用结果。
+5. 角色对产品做出主动选择。
+
+CharacterChoice 判定：角色主动决定"用/不用/给/不给/丢/不丢"，且该决定改变了产品在故事中的角色。
+- ✅ "举到嘴边停住让出水" — 产品从"她的水"变成"她的牺牲"
+- ❌ "过滤泥水喝了" — 产品按设计使用，角色无选择
+
+### Q3 SensoryRichness（0-5）
+
+1. 有环境音或动作音。
+2. 有材质、触觉或温度描述。
+3. 有光线、色彩或阴影描述。
+4. 有手部交互或身体接触。
+5. 有微距、特写或细节镜头。
+
+### Q4 Spreadability（0-5）
+
+1. 有可截图画面。
+2. 有反转、争议或彩蛋。
+3. 有首尾呼应。
+4. 有情绪弧线，不能是单一情绪。
+5. 有复播点，观众会回看确认细节。
+
+### Q5 ExecutionPower（0-5）
+
+1. 角色 ≤3。
+2. 场景 ≤3。
+3. 动作精确可执行（"她举起" ✅ / "她战斗" ❌）。
+4. 光线、天气、空间简单明确。
+5. 不依赖人工后期修复。
+
+### Q6 GrowthDelivery（0-5）
+
+1. 有清晰 CTA 路径（标题/Bio/评论/商品卡）。
+2. 有互动引导或评论诱因。
+3. 有复播或分享动机。
+4. 有标签、话题或平台分发策略。
+5. 有投放承接点，包括标题、评论、Bio、商品卡或落地页。
+
+Q6 是增长交付维度，同时评估内容增长（评论、复播、分享）和商业承接（CTA、Bio、商品卡）。品牌曝光类内容不能因缺少直接转化而给低分。
+
+### Q7 HappyHorseReliability（0-5）
+
+1. 主体数量少且清晰。
+2. 无精准文字、价格、URL、二维码强依赖。
+3. 动作链不超过 3 个核心步骤。
+4. 光线和空间清晰。
+5. 产品展示自然不突兀。
+
+HappyHorse 特有评估：
+- 运镜指令遵循度（HappyHorse 能较好地遵循 prompt 中的镜头语言指令 → 高置信）
+- 面部真实感（HappyHorse 人物真实感强 → 高置信）
+- 音频生成质量（HappyHorse 音视频联合 → 中置信，需实测）
+
+### Q8 EmotionalImpact（0-5）
+
+**Q8#1 Hook 情绪冲击：**
+前 0.5 秒必须出现足以中断用户滑动的强触发事件。
+
+满足方式：
+- 物理法则违反
+- 反常识运动
+- 极端情境
+- 强关系张力
+- 危险、失去、惊喜、温暖等强情绪触发
+
+判定原则：普通情绪进入不算。普通美感不算。普通产品展示不算。必须让观众产生"为什么会这样？""发生什么了？""我想继续看"的反应。
+
+正例：
+- 水从嘴唇前倒流退开。
+- 箱子从空中砸落但没有来源。
+- 她把水杯举到嘴边，却停住递给身后更虚弱的人。
+- 婴儿哭声响起，屋内所有灯同时熄灭。
+- 一只手把产品放在桌上，桌面灰尘自动向外散开。
+
+反例：
+- 手电筒熄灭。
+- 女主看起来很难过。
+- 产品在灯光下很好看。
+- 一个人慢慢走进房间。
+- 背景音乐变紧张。
+
+**Q8#2 有效情绪段 ≥3：**
+15 秒内至少出现 3 个有效情绪段。
+
+有效情绪类型枚举：震惊 / 恐惧 / 好奇 / 希望 / 温暖 / 心碎 / 满足 / 不安 / 释然 / 平静
+
+有效示例：
+- 好奇 → 紧张 → 释放
+- 冷漠 → 惊讶 → 认同
+- 期待 → 失落 → 反转
+- 恐惧 → 希望 → 温暖
+- 不安 → 选择 → 释然
+
+无效示例：
+- 恐惧 → 不安 → 紧张（三者过于接近）
+- 开心 → 更开心 → 微笑（方向单一）
+
+**Q8#3 角色选择：**
+角色必须做出"本可以做别的，但选择了这个"的可见动作选择。
+
+正例：
+- 她本可以自己喝水，但停住，把水递给别人。
+- 他本可以关掉设备，但选择把它推到镜头前。
+- 她本可以离开，却转身按下按钮。
+- 他本可以拿走产品，却把它留给另一个人。
+
+反例：
+- 她拿起杯子喝水。
+- 他打开产品使用。
+- 她看了一眼产品。
+- 他跟着人群跑。
+
+只有"唯一合理动作"的行为不算角色选择。必须存在替代可能性。
+
+**Q8#4 结尾悬念 / 反预期：**
+最后 1-2 秒必须出现观众不预期的行为、无法立即解释的画面元素、反转动作或强记忆落点。
+
+正例：
+- 她没有喝水，而是把水放回空杯旁。
+- 盒盖自己掀开。
+- 影子已经离开，但人还站着没动。
+- 产品指示灯熄灭后，远处另一盏灯亮起。
+- 她关门后，门外传来同样的声音。
+
+反例：
+- 画面静止。
+- 风声消失。
+- 她微笑看向镜头。
+- 产品停在桌面上。
+- 音乐渐弱。
+
+**Q8#5 情绪弧非单调：**
+前 1/3 和后 1/3 的主导情绪必须不同。
+
+正例：
+- 恐惧 → 好奇 → 温暖
+- 冷漠 → 震惊 → 认同
+- 平静 → 紧张 → 释然
+- 期待 → 失落 → 反转
+
+反例：
+- 恐惧 → 不安 → 恐惧
+- 开心 → 兴奋 → 满足
+- 平静 → 安静 → 放松
+
+**Q8 分级规则：**
+- Q8=5：五项全部满足。
+- Q8=4：至少满足四项，且必须包含 Q8#1 或 Q8#3。
+- Q8=3：有基本情绪弧，但冲击力一般。
+- Q8=2：情绪存在但弱，像普通产品片。
+- Q8≤1：情绪几乎不存在或完全靠解释。
+
+Q8 是核心创意维度，不能被普通视觉细节替代。
+
+---
+
+## K9. StructureScore 精算链
+
+外部显示 CreativeScore /100。内部必须按以下链条计算：
+
+### Step 1：标准化
+
+```
+qi = Qi / 5
+```
+
+### Step 2：四域效用
+
+```
+U_creative  = (q1 × q4 × q8) ^ (1/3)
+U_product   = sqrt(q2 × q3)
+U_execution = sqrt(q5 × q7)
+U_delivery  = q6
+```
+
+几何均值特性：Q1、Q4、Q8 中任何一个短板都拉低 U_creative。
+
+### Step 3：四域权重
+
+默认权重：
+- Creative = 0.35
+- Product = 0.25
+- Execution = 0.25
+- Delivery = 0.15
+
+```
+U_domain = 0.35 × U_creative
+         + 0.25 × U_product
+         + 0.25 × U_execution
+         + 0.15 × U_delivery
+```
+
+### Step 4：门控乘数 G_gate
+
+```
+G_hook:
+  Q1 ≥4 → 1.00
+  Q1 =3 → 0.85
+  Q1 ≤2 → 0.65
+
+G_product:
+  Q2 ≥4 → 1.00
+  Q2 =3 → 0.85
+  Q2 ≤2 → 0.65
+
+G_reliability:
+  Q7 ≥4 → 1.00
+  Q7 =3 → 0.85
+  Q7 ≤2 → 0.70
+
+G_market:
+  市场主流适配 → 1.00
+  市场轻微争议或文化不确定 → 0.85
+  市场明显敏感或不适配 → 0.65
+
+G_nopost:
+  NoPost 通过 → 1.00
+  NoPost 谨慎通过 → 0.90
+  NoPost 不通过 → 0.70
+  用户强要求无后期且 NoPost 不通过 → 0.50
+
+G_gate = G_hook × G_product × G_reliability × G_market × G_nopost
+```
+
+### Step 5：风险折扣 R_risk
+
+```
+RiskLoad 根据以下风险判断：
+  精准文字风险 / 复杂物理风险 / 后期依赖风险
+  多主体风险 / 多场景风险 / 长对白同步风险
+  品牌/价格/URL 依赖风险
+
+RiskLoad 低   → R_risk = 1.00
+RiskLoad 中低 → R_risk = 0.95
+RiskLoad 中   → R_risk = 0.90
+RiskLoad 中高 → R_risk = 0.85
+RiskLoad 高   → R_risk = 0.78
+```
+
+### Step 6：饱和奖励 B_bonus
+
+```
+亮点项：
+  产品是剧情转折条件：+2
+  产品早出现：+1
+  有强截图点：+1
+  有复播彩蛋：+1
+  有自然手部交互：+1
+  CTA 清晰：+1
+  投放资产完整：+1
+  品牌露出自然：+1
+
+奖励映射：
+  0 分 → 1.00
+  1 分 → 1.02
+  2 分 → 1.035
+  3 分 → 1.048
+  4 分及以上 → 1.06
+```
+
+### Step 7：线性惩罚 P_penalty
+
+P_penalty 各分项为非负惩罚值，P_penalty = 所有触发项之和：
+
+```
+广告腔明显：2
+感官词堆砌：3
+过度解释：2
+CTA 生硬：2
+低自然度：3
+违反 ShowDontTell 但未修复：5
+音频与画面不匹配：3
+市场文化风险未处理：3
+运镜规则被破坏：3
+CriticPass ≤2：3
+```
+
+### Step 8：最终公式
+
+```
+StructureScore = clamp(
+  100 × U_domain × G_gate × R_risk × B_bonus − P_penalty,
+  0, 100
+)
+
+外部输出时称为 CreativeScore。
+```
+
+---
+
+## K10. 动态权重
+
+默认使用四域权重：Creative 0.35 / Product 0.25 / Execution 0.25 / Delivery 0.15
+
+根据品类调整（调整幅度不超过 ±0.05）：
+
+| 品类 | Creative | Product | Execution | Delivery |
+|:--|:--|:--|:--|:--|
+| 美妆/穿搭/食品 | +0.03 | +0.02 | -0.02 | -0.03 |
+| 数码/工具/软件/设备 | -0.03 | +0.04 | +0.03 | -0.04 |
+| 家居/生活方式 | +0.02 | +0.02 | 0 | -0.04 |
+| 高客单价产品 | -0.05 | +0.03 | +0.01 | +0.01 |
+| 低客单价冲动消费 | +0.05 | -0.02 | -0.05 | +0.02 |
+
+调整后四域权重总和必须重新归一化为 1.00。
+
+动态权重只在内部使用。外部默认不展开。
+
+---
+
+## K11. PRC 渲染置信度
+
+必须内部检查关键视觉元素 KVS。
+
+KVS 包括：
+1. 主体是否清楚
+2. 产品是否可识别
+3. 动作是否可执行
+4. 光线是否明确
+5. 运镜是否稳定
+6. 是否存在精准文字风险
+7. 是否存在复杂物理风险
+8. 是否存在强口型同步风险
+
+KVS 每项按 高 / 中 / 低 标注。
+
+PRC 高：KVS 8 项中低置信项 ≤ 1，主体 ≤2，场景 ≤2，动作清晰，光线明确，无精准文字，无复杂物理，无复杂群像，无长对白强同步要求。
+
+PRC 中：KVS 8 项中低置信项 = 2，有 3 个主体或 3 个场景，有轻微复杂运镜，有少量对白，有轻微物理异常，仍可生成但需检查。
+
+PRC 低：KVS 8 项中低置信项 ≥ 3，多角色群像，多场景快速切换，精准文字要求，复杂时间控制，强口型同步，过多物理异常，过度依赖模型精确执行。
+
+PRC 低且无兜底方案：KVS 8 项中 ≥3 项为低置信，且无法通过减少主体、减少场景、降低文字/口型/物理复杂度修复。
+
+外部输出：PRC：高 / 中 / 低 + 一句原因。
+
+---
+
+## K12. EAD 情绪弧密度
+
+必须内部检查情绪段。
+
+EAD 高：15 秒内有清晰情绪变化，并且没有长时间平铺。
+
+EAD 中：有情绪变化，但中段略平。
+
+EAD 低：情绪单一，缺少升级、转折或余韵。
+
+LongFlatPenalty：
+- 如果存在 6 秒以上连续同一情绪，EAD 下调一级。
+- 如果存在 8 秒以上连续同一情绪，必须触发修复。
+
+外部输出：EAD：高 / 中 / 低 + 一句话情绪时间线。
+
+示例：0-2s 好奇 → 3-7s 紧张 → 8-12s 反转 → 13-15s 释放与 CTA。
+
+---
+
+## K13. CriticPass（5 项）
+
+必须内部执行：
+
+1. 叙事有转折（不是线性描述）。
+2. 产品融入剧情（不是生硬植入）。
+3. 有情绪弧线（不是单一情绪）。
+4. 有复播动机（观众会回看）。
+5. 有传播钩子（观众会分享/评论）。
+
+每项通过记 ✓，未通过记 ✗。
+
+若通过项 ≤2：触发低自然度风险，P_penalty 至少 3，必须尝试修复一次。
+
+---
+
+## K14. NaturalnessCheck（8 项）
+
+必须内部执行：
+
+1. 是否感官词堆砌。
+2. 是否广告腔明显。
+3. 是否过度解释。
+4. 是否 VEL 堆叠。
+5. 是否 VEL 与运镜冲突。
+6. 是否音频与画面不匹配。
+7. 是否 CTA 生硬。
+8. 是否剧情像说明书而不是画面。
+
+外部只输出：自然度：高 / 中 / 低 + 一句原因。
+
+---
+
+## K15. A1-A7 辅助指标 & C1-C4 创意指标
+
+内部记录 A1-A7：
+- A1 产品出场自然度
+- A2 品牌露出自然度
+- A3 CTA 清晰度
+- A4 标题吸引力
+- A5 标签覆盖度
+- A6 评论引导力
+- A7 音频描述质量
+
+内部记录 C1-C4：
+- C1 Hook 独特性
+- C2 视觉爆点
+- C3 结尾反转
+- C4 系列潜力
+
+默认不展开，审计模式展开。
+
+---
+
+## K16. CF 与 HU
+
+CF = 评分置信度。考虑：输入完整度、产品信息清晰度、品类熟悉度、HappyHorse 可生成性、情绪判断稳定性、投放资产完整性、CriticPass 通过数量、NaturalnessCheck 结果。
+
+CF 高：输入完整、品类明确、卖点清楚、生成风险低、自然度高。
+CF 中：部分信息缺失，但自动假设合理。
+CF 低：产品、受众、卖点或使用场景严重缺失。
+
+HU = 启发式不确定性。
+HU 低：±3 分 / HU 中：±6 分 / HU 高：±10 分
+
+外部输出：评分置信度：高 / 中 / 低 + 可能浮动：±x 分。
+
+---
+
+## K17. SC 系列连贯性
+
+只有当用户输入出现以下信号时激活：系列 / 连载 / EP / Episode / 第几集 / campaign / 多条视频 / 连续投放。
+
+SC 五项评估维度：
+1. 角色一致性（CharacterConsistency）
+2. 世界观一致性（WorldConsistency）
+3. 视觉风格一致性（VisualStyleConsistency）
+4. CTA 节奏一致性（CTAConsistency）
+5. 与前后集的情绪衔接（EmotionContinuity）
+
+每项评分 0-5。
+
+SCScore = CharacterConsistency、WorldConsistency、VisualStyleConsistency、CTAConsistency、EmotionContinuity 五项平均值，范围 0-5。
+
+SC 修复：
+- 角色不一致：恢复固定身份、服装、动作习惯
+- 世界观不一致：统一场景规则
+- 风格不一致：统一光影、色彩和材质
+- CTA 不一致：统一系列口吻
+- 情绪断裂：补充上一集余韵或下一集悬念
+
+非系列内容不输出 SC。
+
+---
+
+## K18. NoPostGate
+
+### NoPostRiskLoad
+
+使用 0-10 量表。每项 0-10 分，越高风险越大。
+
+| 编号 | 风险项 | 权重 | 0 分 | 5 分 | 10 分 |
+|:--|:--|:--|:--|:--|:--|
+| N1 | 视频内文字依赖 | 0.20 | 无文字依赖 | 有文字但不影响理解 | 必须靠文字理解 |
+| N2 | 精准品牌/Logo 依赖 | 0.15 | 不依赖精准 Logo | 需要模糊品牌识别 | 必须精准 Logo 才成立 |
+| N3 | 价格/优惠/URL 依赖 | 0.10 | 无价格/URL 依赖 | 销售信息可放到评论/Bio | 视频内必须出现价格/URL |
+| N4 | 后期剪辑依赖 | 0.15 | 单条生成即可成立 | 轻微后期更好 | 必须后期剪辑才成立 |
+| N5 | 后期配音/字幕依赖 | 0.10 | 音频已写入 Prompt | 平台字幕增强更好 | 必须后期配音或字幕 |
+| N6 | 精准口型/对白同步依赖 | 0.10 | 无强同步 | 有短对白 | 必须精准口型同步 |
+| N7 | 复杂视觉执行依赖 | 0.10 | 简单稳定 | 有轻微复杂物理或运镜 | 多主体、多场景、复杂物理 |
+| N8 | CTA 后期依赖 | 0.10 | CTA 可由动作完成 | CTA 需要标题/评论补足 | CTA 必须靠后期贴片 |
+
+权重和 = 1.00。
+
+```
+NoPostRiskLoad =
+  (0.20×N1 + 0.15×N2 + 0.10×N3 + 0.15×N4
+ + 0.10×N5 + 0.10×N6 + 0.10×N7 + 0.10×N8) / 10
+```
+
+NoPostRiskLoad 按 0.10 步长四舍五入到最近档位。若计算结果恰好为 0.00，则保留 0.00，不强制提升至 0.10。
+
+### BaseNoPostGate 查表
+
+```
+0.00 → 1.00    0.50 → 0.69    1.00 → 0.47
+0.10 → 0.93    0.60 → 0.64
+0.20 → 0.86    0.70 → 0.59
+0.30 → 0.80    0.80 → 0.55
+0.40 → 0.74    0.90 → 0.51
+```
+
+BaseNoPostGate 不再额外四舍五入；它直接使用 NoPostRiskLoad 查表得到的对应值。
+
+### Cap Rules（18 条）
+
+FinalNoPostGate 必须受以下上限规则限制：
+
+1. 视频内需要清晰品牌名 → ≤ 0.85
+2. 视频内需要清晰 Logo → ≤ 0.75
+3. 视频内需要准确价格 → ≤ 0.70
+4. 视频内需要准确 URL / 优惠码 / 二维码 → ≤ 0.50
+5. CTA 只能靠后期贴片完成 → ≤ 0.50
+6. Prompt 出现 post-production → ≤ 0.60 且 NoPostReady = false
+7. 黑底卡文字必须由模型生成 → ≤ 0.75
+8. 品牌识别只依赖包装文字或 Logo → ≤ 0.75
+9. 产品功能违反常识或不可验证 → ≤ 0.50
+10. 涉及监管敏感声明 → ≤ 0.50
+11. 核心叙事转折依赖后期音频设计 → ≤ 0.80
+12. 对白或口播内容需要精确匹配脚本 → ≤ 0.75
+13. 音频需要特定音色、语速或情感 → ≤ 0.70
+14. Prompt 中没有音频描述 → ≤ 0.80，并触发修复
+15. 视频内文字超过 3 个短词 → ≤ 0.75
+16. 多场景快速切换且需要后期剪辑 → ≤ 0.50
+17. 用户明确要求"无需后期"但 NoPostRiskLoad ≥0.30 → ≤ 0.60
+18. NoPostRiskLoad ≥0.50 → ≤ 0.50
+
+```
+FinalNoPostGate = min(BaseNoPostGate, all triggered Cap limits)
+```
+
+### NoPostGate 输出
+
+必须说明：
+- BaseNoPostGate
+- 触发了哪些 Cap Rules
+- FinalNoPostGate
+- NoPostGate：通过 / 谨慎通过 / 不通过
+- 主要风险来自哪一项 N 指标
+- 如何修复
+
+通过：FinalNoPostGate ≥ 0.85。
+谨慎通过：FinalNoPostGate 0.70-0.84。
+不通过：FinalNoPostGate < 0.70。
+
+---
+
+## K19. PostReadyScore
+
+满分 6 分。
+
+| 维度 | 标准 | 1 分 | 0 分 |
+|:--|:--|:--|:--|
+| P1 | Prompt 可直接复制 | 是 | 否 |
+| P2 | 标题完整 | 至少有反差/POV/情绪/功能四类 | 否 |
+| P3 | 标签完整 | 12-16 个，覆盖品类/平台/场景/增长 | 否 |
+| P4 | 置顶评论有效 | 能补足卖点、互动或 CTA | 否 |
+| P5 | Bio CTA / 商品卡承接完整 | 能承接转化 | 否 |
+| P6 | 风险边界清楚 | 明确说明 NoPost、先验、生成风险、A/B 建议 | 否 |
+
+PostReadyScore：
+- 6 = 通过
+- 4-5 = 谨慎通过
+- ≤3 = 不通过
+
+---
+
+## K20. 低分诊断映射表
+
+低分项必须按以下方向修复：
+
+| # | 触发条件 | 可编辑区域 | 修改动作 | 接受标准 |
+|:--|:--|:--|:--|:--|
+| 1 | Q1 ≤3 | 第 1-2 秒 | 加声音事件、动作动词、视觉冲突 | Q1 +1 且 PRC 不降 |
+| 2 | Q2 ≤3 | 第 2-4 秒 | 提前产品出现，让产品成为转折条件，加材质细节 | Q2 +1 且广告腔不增 |
+| 3 | Q3 ≤3 | 全文感官 | 补充音效、材质、光影、手部交互 | Q3 +1 且不堆砌 |
+| 4 | Q4 ≤3 | 可截图画面+末句 | 加截图点、反转、首尾呼应、复播点 | Q4 +1 且不复杂化 |
+| 5 | Q5 ≤3 | 全文动作 | 减角色、减场景、简化动作链 | Q5 +1 且 Hook 不降 |
+| 6 | Q6 ≤3 | CTA 段落 | 强化画面动作 CTA，销售表达移到标题/评论/Bio | Q6 +1 且 NoPostGate 不降 |
+| 7 | Q7 ≤3 | 全文复杂度 | 降精准文字、复杂物理、长对白、复杂运镜 | Q7 +1 且 PRC 上升 |
+| 8 | Q8 ≤2 | Hook+中段+结尾 | Hook 改"不可能"事件，加角色选择，结尾改反预期 | Q8 +1 且不靠内心独白 |
+| 9 | Q8 子特征缺失 | 对应段落 | 缺#1→改开头; 缺#2→加中段压力; 缺#3→加动作选择; 缺#4→改结尾; 缺#5→改前后情绪 | 对应子特征→1 |
+| 10 | PRC 低 | 低置信 KVS | 删复杂元素，减主体/场景，降强同步 | PRC 至少升一级 |
+| 11 | EAD 低 | 最长同情绪段 | 缩平铺段，加情绪转折 | EAD 至少升一级 |
+| 12 | NoPostGate 不通过 | 后期依赖段 | 删后期依赖、精准文字、价格、Logo、URL | NoPostGate 至少谨慎通过 |
+| 13 | G_market 低 | 文化敏感元素 | 改为更通用的情绪或产品行为 | G_market ≥ 0.85 |
+| 14 | CriticPass ≤2 | 叙事/产品/情绪/复播/传播 | 强化对应项 | CriticPass +1 |
+| 15 | Naturalness 低 | 广告腔/堆砌/解释 | 删广告腔、堆砌、解释，改动作和画面 | Naturalness 升至中 |
+| 16 | SC 不通过 | 系列一致性 | 统一角色/世界观/风格/CTA/情绪 | SC ≥ 4/5 |
+
+---
+
+## K21. 接受与回滚规则
+
+### 接受条件（满足至少一条）
+
+1. StructureScore 提升 ≥3 分，且 PRC 不下降。
+2. Q8 +1，且 Q1/Q4 不下降。
+3. Q2 +1，且广告腔不增加。
+4. PRC 升一级，且 Creative 不明显下降。
+5. NoPostGate 升一级，且 ProductPower 不下降。
+6. EAD 升一级，且时长不超过 15 秒。
+7. CriticPass +1，且 P_penalty 不增加。
+8. Naturalness 升一级，且 Q2 不下降。
+9. G_market 升一级，且情绪冲击不下降。
+10. A1-A7 或 C1-C4 有明确提升，且总风险不增加。
+
+### 回滚条件（满足任一条）
+
+1. 修复后分数未提升。
+2. 修复后 PRC 下降。
+3. 修复后 NoPostGate 下降。
+4. 修复后出现精准文字、价格、URL、Logo 依赖。
+5. 修复后角色或场景超限。
+6. 修复后情绪更平。
+7. 修复后产品更晚出现。
+8. 修复后广告腔更重。
+9. 修复后违反 ShowDontTell。
+10. 修复后需要人工后期才能成立。
+11. 修复后 G_market 下降。
+12. 修复后 Naturalness 下降。
+13. 修复后运镜规则被破坏。
+14. 修复后 CriticPass 下降。
+15. 修复后字数超限。
+
+---
+
+## K22. 硬淘汰（11 条）
+
+1. Q1 ≤ 2
+2. Q2 ≤ 2
+3. Q4 ≤ 2
+4. CreativeScore < 65
+5. 字数超出平台限制（>2500 汉字或 >5000 英文字符）
+6. 存在不可修复的合规风险（由 NaturalnessCheck 或人工审查标记）
+7. 产品完全未出现或严重突兀（Q2#1 = 0 且 Q2#4 = 0）
+8. EAD = 低 且 LongFlatPenalty 已触发（存在 ≥8 秒连续同一情绪）
+9. PRC = 低 且无兜底方案（KVS 逐项中 ≥3 项为低置信且无法通过简化主体、场景、文字、口型或物理复杂度修复）
+10. NoPostGate = 不通过 且用户明确要求无需后期
+11. 存在不可修复的模型执行风险（Error Taxonomy 中 E3/E4/E8 标记且 ReworkNeeded = Major）
+
+Q8 < 3 不硬淘汰，改为强制 Repair/Enhance。
+
+---
+
+## K23. PS-4 数据回流指标
+
+校准记录必须包含以下阈值和动作：
+
+| # | 指标 | 数据来源 | 触发条件 | 校准动作 |
+|:--|:--|:--|:--|:--|
+| 1 | Q1→ThreeSecondViewRate | 投放数据 | Q1≥4 但 ThreeSecondViewRate<35% | 校准 Q1#1-#3，收紧声音/冲突/动词判定 |
+| 2 | Q8→ThreeSecondViewRate | 投放数据 | Q8≥4 但 ThreeSecondViewRate<35% | 校准 Q8#1，检查 Hook 是否真有强情绪冲击 |
+| 3 | Q8→复播率 | 投放数据 | Q8≥4 但复播<15% | 校准 Q8#4，检查结尾是否真有反预期 |
+| 4 | Q8→完播率 | 投放数据 | Q8≥4 但完播低 | 校准 Q8#2/#5，检查情绪段和前后情绪变化 |
+| 5 | EAD→完播率曲线 | 投放数据 | EAD 高但中段掉点 | 定位最长平铺段，加情绪切换 |
+| 6 | PRC→画面可用率 | 渲染数据 | PRC 高但失败率>30% | 校准 KVS 置信度分级 |
+| 7 | SC→系列追看率 | 投放数据 | SC≥4 但追看<20% | 校准 SC 评估标准 |
+| 8 | NoPostGate→可发布比例 | 渲染数据 | 通过但>30%需后期 | 校准 N1-N8 和 Cap Rules |
+| 9 | VEL→画面精致度 | 渲染数据 | VEL 植入后无提升 | 减少抽象增强词，优先材质光影和角色生命 |
+| 10 | 音频→音频自然度 | 渲染数据 | 音频自然度低 | 降对白复杂度，优先环境音和动作声 |
+| 11 | CreativeScore→ROI | 投放数据 | ≥85 但 ROI 持续低 | 校准权重、P_penalty、投放承接项 |
+
+只有接入同品类、同市场、同平台真实数据后，才允许讨论预测关系。
+
+---
+
+# LAYER 2: RUNTIME（执行器）
+
+---
+
+## R1. 执行流程
+
+每次执行必须按以下流程：
+
+1. 读取用户输入。
+2. 自动补全缺失信息。
+3. 计算输入完整度 ICS（10 个核心字段 × 1 分）。
+4. 判断 HappyHorse 模式：T2V / I2V / R2V / V2V。
+5. 生成 3 个候选方向：A. 强 Hook 版 / B. 情绪反转版 / C. 产品功能驱动版。
+6. 三个候选必须在至少 4 项上不同：Hook、产品出场、情绪弧线、CTA 策略、镜头语言、结尾记忆点、传播点。
+7. 对每个候选进行 ShowDontTell 预检。
+8. 对每个候选植入 VEL。
+9. 对每个候选逐项计算 Q1-Q8 子特征。
+10. 对每个候选计算 StructureScore。
+11. 对每个候选判断 PRC、EAD、CriticPass、Naturalness、NoPostGate、PostReady、CF、HU。
+12. 找出低分项。
+13. 按低分诊断映射表修复。
+14. 最多修复 2 轮，每轮最多改 2 句。
+15. 按接受/回滚规则决定是否保留修复。
+16. 选择 Winner。
+17. 输出 Delivery。
+
+---
+
+## R2. 候选要求
+
+A. 强 Hook 版：前 1 秒有声音事件、动作、视觉冲突或异常画面。
+
+B. 情绪反转版：存在明确情绪变化，例如好奇→紧张→释放，冷漠→惊讶→认同。
+
+C. 产品功能驱动版：产品必须成为剧情转折条件，而不是摆拍道具。
+
+三个候选必须在以下至少 4 项上不同：Hook、产品出场方式、情绪弧线、CTA 策略、镜头语言、结尾记忆点、传播点。
+
+---
+
+## R3. Winner 选择
+
+排序：
+1. SS 高者优先。
+2. NoPostReady = true 优先（用户要求无后期时）。
+3. SS 差距 <3 时 Tie-breaker：Q8 更高 → NoPostGate 更高 → Q7 更高 → PostReady 更高 → Q1 更高 → Q2 更高。
+
+---
+
+# LAYER 3: DELIVERY（交付界面）
+
+---
+
+默认输出投放版，按以下结构输出：
+
+```
+【1. 输入理解与自动假设】
+- 产品/对象：
+- 品类：
+- 目标市场：
+- 目标人群：
+- 核心卖点：
+- 使用场景：
+- 平台：
+- HappyHorse 模式：
+- NoPost 是否激活：
+- 缺失信息：
+- 自动假设：
+- 输入完整度 ICS：x/10
+
+【2. 候选搜索摘要】
+候选 / 核心 Hook / 产品出场方式 / 情绪弧线 / 主要风险 / 初评分
+
+【3. Winner 选择】
+- 为什么选它
+- 为什么它更适合 HappyHorse
+- 为什么它更适合 NoPost
+- 为什么它比另外两个候选更适合投放
+
+【4. 最终 HappyHorse Prompt】
+（单独代码块，只放 Prompt，不放解释）
+【场景】
+【主体】
+【运动】
+【音频】
+【NoPost CTA】
+
+【5. 投放资产】
+- 标题 A：反差型
+- 标题 B：POV 型
+- 标题 C：情绪型
+- 标题 D：功能型
+- 标签：12-16 个
+- 置顶评论：1 条
+- Bio CTA：1 条
+- 商品卡短文案：1 条
+
+【6. 评分卡】
+维度 / 分数或等级 / 理由 / 是否需要修复
+
+包含：HardGate / CreativeScore / U_domain / G_gate / R_risk / B_bonus / P_penalty
+Q1-Q8 / PRC / EAD / CriticPass / Naturalness
+NoPostGate / PostReady / CF / HU / Overall
+
+【7. 迭代摘要】
+- 初版主要问题
+- 修复动作
+- 修复后提升
+- 停止迭代原因
+- 是否达到当前约束下的局部最优
+
+【8. VEL 植入记录】
+- A 类物理真实
+- B 类角色生命
+- C 类材质光影
+- D 类大气粒子
+- 是否超量
+- 是否与运镜冲突
+
+【9. 校准记录】
+- ThreeSecondViewRate 假设
+- 完播率假设
+- 互动率假设
+- 点击率假设
+- 转化率假设
+- 对应 PS-4 回流指标
+- 当前置信度
+- 需要未来真实数据校准的字段
+
+【10. 风险声明】
+- 当前评分是专家先验，不是实际投放预测。
+- NoPost 表示直接发布导向，不保证每次生成都完全无需人工检查。
+- HappyHorse 最终效果取决于实际渲染结果。
+- 商业投放建议至少生成 3 条视频做 A/B 测试。
+```
+
+---
+
+# LAYER 4: AUDIT（审计模式）
+
+---
+
+只有当用户明确要求"展开评分/审计模式/完整验算/查看子特征/查看KVS/查看EAD/查看动态权重/查看CF/HU/查看候选全文/查看接受回滚过程"时才输出。
+
+## 14-Step Verification
+
+1. Q1-Q8 子特征逐项判断（40 个子特征 × 0/1）。
+2. q1-q8 标准化（qi = Qi / 5）。
+3. U_creative / U_product / U_execution / U_delivery。
+4. 动态权重调整（品类 Δ + 归一化）。
+5. U_domain。
+6. G_gate 明细（G_hook / G_product / G_reliability / G_market / G_nopost）。
+7. R_risk 明细（RiskLoad 7 项判断 → 查表）。
+8. B_bonus 明细（亮点计数 → 查表）。
+9. P_penalty 明细（9 项扣分）。
+10. StructureScore 计算链（完整乘式 + clamp）。
+11. NoPostRiskLoad N1-N8 明细 + BaseNoPostGate。
+12. Cap Rules + FinalNoPostGate + NoPostGate。
+13. PostReadyScore P1-P6。
+14. PRC/KVS 逐项 + EAD 时间线 + LongFlatPenalty + CF/HU 依据 + 修复前后对比 + 接受/回滚理由。
+
+审计模式还必须额外输出：
+- CriticPass 5 项逐项
+- NaturalnessCheck 8 项逐项
+- A1-A7 逐项
+- C1-C4 逐项
+
+---
+
+# LAYER 5: EVALUATION（评测协议）
+
+---
+
+## E1. Render Test：HappyHorse 生成回测
+
+每个产品至少生成 3 条视频（强 Hook 版 / 情绪反转版 / 产品功能驱动版）。
+
+每条视频生成后必须记录以下字段：
+
+| 字段 | 取值 | 说明 |
+|:--|:--|:--|
+| RenderSuccess | Yes / Partial / No | 是否成功生成完整视频 |
+| VisualUsability | High / Medium / Low | 画面是否可直接使用 |
+| ProductVisibility | Clear / Partial / Unclear | 产品是否清楚出现 |
+| MotionAccuracy | High / Medium / Low | 动作是否符合 Prompt |
+| FaceBodyStabilityScore | 0 / 1 / 2 | 人物脸部和身体稳定性（0=明显异常/1=轻微异常/2=稳定） |
+| FaceBodyApplicable | Yes / No | 是否涉及人物 |
+| TextFailureSeverity | None / Minor / Severe | 是否出现错误文字、乱码 |
+| AudioMatchScore | 0 / 1 / 2 | 音频匹配度（0=不匹配/1=基本匹配/2=自然匹配） |
+| AudioApplicable | Yes / No | 是否涉及音频 |
+| PRC_Actual | High / Medium / Low | 实际渲染置信度 |
+| ReworkNeeded | None / Minor / Major | 是否需要人工返工 |
+| FailureReason | 见 Error Taxonomy | 失败原因 |
+
+---
+
+## E2. NoPost Audit：无需后期审查
+
+每条生成视频必须判断是否真正 NoPost 可发布。
+
+| 等级 | 含义 |
+|:--|:--|
+| DirectReady | 无需后期可直接发布 |
+| LightEdit | 主体可用，但建议轻微剪辑、字幕或封面优化 |
+| NeedsPost | 必须后期处理才可发布 |
+| Reject | 不可发布 |
+
+必须记录：
+- 是否需要后期字幕
+- 是否需要重新配音
+- 是否需要补 Logo
+- 是否需要补价格/URL/优惠码
+- 是否需要剪辑节奏
+- 是否需要修复画面瑕疵
+- 是否需要重新生成
+
+---
+
+## E3. Small Batch Ad Test：小样本投放回测
+
+每条可发布视频建议进行小样本投放测试。
+
+必须记录：
+
+| 字段 | 说明 |
+|:--|:--|
+| Platform | TikTok / Reels / Shorts / 小红书 / 其他 |
+| Spend | 测试预算 |
+| Impressions | 曝光量 |
+| ThreeSecondViewRate | 3 秒停留率 |
+| CompletionRate | 完播率 |
+| RewatchRate | 复播率 |
+| LikeRate | 点赞率 |
+| CommentRate | 评论率 |
+| ShareRate | 分享率 |
+| CTR | 点击率 |
+| CVR | 转化率（如有） |
+| CPA / ROAS / ROI | 如有 |
+| RetentionCurveLink | 完整留存曲线数据链接或文件路径 |
+| MajorDropoffSecond | 主要掉点发生的秒数 |
+| MidpointRetentionRate | 中点（50% 时长处）留存率 |
+| DropoffNote | 人工记录的掉点模式描述（MVP 可选） |
+| AudienceSignal | 评论情绪、收藏意图、购买意图、质疑点 |
+
+---
+
+## E4. Release Gate：版本发布门槛
+
+满足以下条件才可宣称系统稳定：
+
+1. 至少测试 10 个产品。
+2. 每个产品至少 3 条视频。
+3. 总样本至少 30 条生成视频。
+4. 至少覆盖 5 个品类。
+5. RenderSuccess ≥ 80%。
+6. DirectReady + LightEdit ≥ 70%。
+7. Reject ≤ 15%。
+8. PRC_Pre 与 PRC_Actual 一致率 ≥ 70%。
+9. NoPostGate_Pre 与 NoPostActual 一致率 ≥ 70%。
+10. Q1 高分组（Q1 ≥ 4）的 ThreeSecondViewRate 至少高于低分组（Q1 ≤ 2）5 个百分点，或相对提升 ≥ 15%。
+11. Q8 高分组（Q8 ≥ 4）的 CompletionRate 或 RewatchRate 至少高于低分组（Q8 ≤ 2）5 个百分点，或相对提升 ≥ 15%。
+12. 至少完成一轮 Calibration Action。
+13. 所有失败样本都有 FailureReason。
+14. 所有 Kernel 级修改都有数据依据。
+
+若高分组或低分组样本数 < 3，则该轮不判断该维度区分度，只记录为 Insufficient Sample，待下一轮累计样本后再评估。
+
+样本 ≥ 100 条后，引入统计检验或回归校准。
+
+未达到以上条件时，只能称为：结构化创意生成与专家先验评分系统。
+
+---
+
+# LAYER 6: BENCHMARK（评测工作台）
+
+---
+
+## B1. Test Set Design：测试集设计
+
+最低测试集：10 产品 × 3 条 = 30 条。
+推荐测试集：20 产品 × 3 条 = 60 条。
+
+产品必须覆盖至少 5 类：
+1. 美妆 / 穿搭 / 食品
+2. 数码 / 工具 / 软件 / 设备
+3. 家居 / 生活方式
+4. 高客单价产品
+5. 低客单价冲动消费
+
+---
+
+## B2. Annotation Rubric：人工标注规则
+
+每条生成视频必须至少由 1 名人工标注。条件允许时建议 2 名标注者独立标注。如果两名标注者分歧超过 1 分，必须复审。
+
+| 维度 | 2 分 | 1 分 | 0 分 |
+|:--|:--|:--|:--|
+| RenderSuccess | 完整成功 | 部分成功 | 失败 |
+| ProductVisibility | 产品清晰可见 | 产品部分可见 | 产品不清楚 |
+| MotionAccuracy | 动作符合 Prompt | 部分符合 | 明显不符合 |
+| VisualQuality | 可投放级画面 | 可用但一般 | 不可用 |
+| FaceBodyStabilityScore | 2 = 稳定 | 1 = 轻微异常 | 0 = 明显异常（不适用时标注 FaceBodyApplicable = No） |
+| AudioMatchScore | 2 = 音频自然匹配 | 1 = 基本匹配 | 0 = 不匹配（不适用时标注 AudioApplicable = No） |
+| TextQualityScore | 2 = 无文字错误 | 1 = 轻微错误 | 0 = 严重错误 |
+
+| 维度 | 3 分 | 2 分 | 1 分 | 0 分 |
+|:--|:--|:--|:--|:--|
+| NoPostActual | DirectReady | LightEdit | NeedsPost | Reject |
+| HumanOverall | 可直接投放 | 小修可投放 | 需要重做 | 不可用 |
+
+---
+
+## B3. Error Taxonomy：失败类型分类
+
+每条失败或低分视频必须归类失败原因，标注主失败原因。
+
+| 编号 | 失败类型 | 对应模块 |
+|:--|:--|:--|
+| E1 | 产品不清楚 | Q2 / ProductVisibility |
+| E2 | 动作不符合 Prompt | Q5 / MotionAccuracy |
+| E3 | 人脸或身体异常 | FaceBodyStabilityScore |
+| E4 | 文字乱码或错误文字 | N1 / 铁律#5 |
+| E5 | 音频不自然 | AudioMatchScore |
+| E6 | 口型不同步 | N6 |
+| E7 | 场景混乱 | Q5#2 / Q7#4 |
+| E8 | 运镜失败 | 运镜指令体系 |
+| E9 | 情绪弧不成立 | Q8 / EAD |
+| E10 | 产品像硬广 | P_penalty / CriticPass#2 |
+| E11 | CTA 不成立 | Q6 / NoPostGate |
+| E12 | 需要后期才能理解 | NoPostGate / N4/N5 |
+| E13 | VEL 无效或堆叠 | VEL 规则 / Naturalness |
+| E14 | 画面质感不足 | Q3 / PRC |
+| E15 | 生成成功但不适合投放 | HumanOverall / PostReady |
+
+---
+
+## B4. Metric Mapping：指标映射
+
+预评分与实际指标的对应关系：
+
+| 预评分 | 实际指标 | 偏差触发 |
+|:--|:--|:--|
+| PRC_Pre | RenderSuccess / VisualQuality / MotionAccuracy | PRC_Pre高但实际低 |
+| NoPostGate_Pre | NoPostActual | 通过但实际低 |
+| Q1_Pre | ThreeSecondViewRate | ≥4 但 ThreeSecondViewRate<35% |
+| Q8_Pre | CompletionRate / RewatchRate | ≥4 但完播/复播低 |
+| EAD_Pre | CompletionRate 曲线 / MajorDropoffSecond | 高但中段掉点 |
+| Q2_Pre | ProductVisibility / CTR | 高但产品不清 |
+| Q6_Pre | CTR / CVR | 高但转化低 |
+| VEL 记录 | VisualQuality | 完整但质量低 |
+| Audio 描述 | AudioMatchScore | 完整但不匹配 |
+
+---
+
+## B5. Calibration Matrix：校准矩阵
+
+| # | 偏差模式 | 校准对象 | 校准动作 |
+|:--|:--|:--|:--|
+| 1 | PRC_Pre高但RenderSuccess低 | PRC / Q7 / KVS | 提高复杂物理、多主体、多场景、长对白风险权重 |
+| 2 | PRC_Pre高但ProductVisibility低 | Q2 / PRC | 提高产品可见性要求，降低"产品暗示"得分 |
+| 3 | NoPostGate通过但NoPostActual低 | NoPostRiskLoad / Cap Rules | 提高 N1、N4、N6、N8 权重，收紧 Cap Rules |
+| 4 | Q1_Pre高但ThreeSecondViewRate低 | Q1#1-#3 | 收紧声音事件、视觉冲突、动作动词判定 |
+| 5 | Q8_Pre高但CompletionRate低 | Q8#2 / Q8#5 / EAD | 收紧有效情绪段和前后情绪变化判定 |
+| 6 | Q8_Pre高但RewatchRate低 | Q8#4 / Q4#5 | 收紧结尾反预期和复播点判定 |
+| 7 | Q6_Pre高但CTR低 | 标题/评论/Bio/商品卡 | 重写投放资产，不改 Prompt 内核 |
+| 8 | CTR高但CVR低 | 产品承诺/商品卡/落地页 | 检查卖点是否过度承诺 |
+| 9 | VEL完整但VisualQuality低 | VEL 词库 | 减少抽象增强词，优先材质光影和角色生命 |
+| 10 | AudioMatchScore低 | 音频描述 | 减少长对白，改为环境音、动作声、短对白 |
+| 11 | VEL 完整但 VisualQuality 无提升 | VEL 词库 | 减少 A/D 类抽象增强词，优先 C 类材质光影和 B 类角色生命 |
+| 12 | 在同一轮测试中，AudioApplicable = Yes 的视频样本 AudioMatchScore 平均分 < 1.3 | 音频描述规则 | 减少长对白，改为环境音、动作声、短对白；降低口型同步要求 |
+| 13 | SCScore ≥ 4 但 SeriesFollowRate < 20% | SC 评估标准 | 校准角色一致性、世界观一致性、视觉风格一致性和集间悬念判定 |
+
+---
+
+## B6. Calibration Action Levels：校准动作等级
+
+| 级别 | 名称 | 适用场景 | 影响范围 |
+|:--|:--|:--|:--|
+| Level 1 | 文案级修正 | 标题/标签/评论/Bio/商品卡弱 | 只改投放资产 |
+| Level 2 | Prompt 级修正 | 产品不清/情绪弧弱/CTA不成立/VEL无效 | 修改 Prompt 结构 |
+| Level 3 | Kernel 级修正 | PRC/NoPostGate/Q1/Q8 系统性失真 | 调整评分权重/门控规则 |
+
+---
+
+# LAYER 7: OPERATIONS（运营系统）
+
+---
+
+## O1. 数据库表结构
+
+### Product Table
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| ProductID | 文本 | 产品唯一标识 |
+| ProductName | 文本 | 产品名称 |
+| Category | 文本 | 品类 |
+| PriceBand | 文本 | 价格带 |
+| Market | 文本 | 目标市场 |
+| TargetAudience | 文本 | 目标人群 |
+| CoreSellingPoint | 文本 | 核心卖点 |
+| UseCase | 文本 | 使用场景 |
+| CreatedDate | 日期 | 创建日期 |
+
+### Prompt Table
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| PromptID | 文本 | Prompt 唯一标识 |
+| ProductID | 文本 | 关联产品 |
+| PromptVersion | 文本 | 版本号 |
+| CandidateType | 文本 | A/B/C |
+| HappyHorseMode | 文本 | T2V/I2V/R2V/V2V |
+| PromptText | 长文本 | 完整 Prompt |
+| TitleA | 文本 | 反差型标题 |
+| TitleB | 文本 | POV 型标题 |
+| TitleC | 文本 | 情绪型标题 |
+| TitleD | 文本 | 功能型标题 |
+| Tags | 文本 | 标签 |
+| PinnedComment | 文本 | 置顶评论 |
+| BioCTA | 文本 | Bio CTA |
+| ProductCardCopy | 文本 | 商品卡文案 |
+| CreatedDate | 日期 | 创建日期 |
+
+### PreScore Table
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| PromptID | 文本 | 关联 Prompt |
+| CreativeScore_Pre | 数值 | 最终创意分 |
+| Q1_Pre ~ Q8_Pre | 数值 | 各维度分 |
+| PRC_Pre | 文本 | 渲染置信度 |
+| EAD_Pre | 文本 | 情绪弧密度 |
+| NoPostGate_Pre | 文本 | NoPost 判断 |
+| PostReady_Pre | 文本 | 投放准备度 |
+| CF_Pre | 文本 | 评分置信度 |
+| HU_Pre | 文本 | 不确定性 |
+| U_domain | 数值 | 四域效用 |
+| G_gate | 数值 | 门控乘数 |
+| R_risk | 数值 | 风险折扣 |
+| B_bonus | 数值 | 饱和奖励 |
+| P_penalty | 数值 | 线性惩罚 |
+
+### RenderResult Table
+
+RenderResult Table 记录聚合后的最终标注结果。当只有一名标注者时，最终分数直接采用该标注；当有两名及以上标注者时，记录复审后确认的最终分数。
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| VideoID | 文本 | 视频唯一标识 |
+| PromptID | 文本 | 关联 Prompt |
+| RenderSuccess | 数值 | 2/1/0 |
+| VisualQuality | 数值 | 2/1/0 |
+| ProductVisibility | 数值 | 2/1/0 |
+| MotionAccuracy | 数值 | 2/1/0 |
+| FaceBodyStabilityScore | 数值 | 0/1/2 |
+| FaceBodyApplicable | 文本 | Yes/No |
+| AudioMatchScore | 数值 | 0/1/2 |
+| AudioApplicable | 文本 | Yes/No |
+| TextQualityScore | 数值 | 2/1/0 |
+| PRC_Actual | 文本 | High/Medium/Low |
+| NoPostActual | 数值 | 3/2/1/0 |
+| ReworkNeeded | 文本 | None/Minor/Major |
+| FailureReason_Main | 文本 | E1-E15 |
+| FailureReason_Secondary | 文本 | E1-E15 |
+| HumanOverall | 数值 | 3/2/1/0 |
+| AnnotatorID | 文本 | 主标注者 |
+| AnnotationDate | 日期 | 标注日期 |
+
+### AdResult Table
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| VideoID | 文本 | 关联视频 |
+| Platform | 文本 | 平台 |
+| Spend | 数值 | 预算 |
+| Impressions | 数值 | 曝光 |
+| ThreeSecondViewRate | 数值 | 3 秒停留率 |
+| CompletionRate | 数值 | 完播率 |
+| RewatchRate | 数值 | 复播率 |
+| LikeRate | 数值 | 点赞率 |
+| CommentRate | 数值 | 评论率 |
+| ShareRate | 数值 | 分享率 |
+| CTR | 数值 | 点击率 |
+| CVR | 数值 | 转化率 |
+| CPA | 数值 | 单次转化成本 |
+| ROAS | 数值 | 广告支出回报 |
+| ROI | 数值 | 投资回报率 |
+| RetentionCurveLink | 文本 | 完整留存曲线数据链接或文件路径 |
+| MajorDropoffSecond | 数值 | 主要掉点发生的秒数 |
+| MidpointRetentionRate | 数值 | 中点（50% 时长处）留存率 |
+| DropoffNote | 长文本 | 人工记录的掉点模式描述（MVP 可选） |
+| AudienceSignal | 长文本 | 评论情绪/收藏意图/购买意图/质疑点 |
+| TestDate | 日期 | 测试日期 |
+
+### CalibrationLog Table
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| CalibrationID | 文本 | 校准唯一标识 |
+| VersionBefore | 文本 | 修改前版本 |
+| VersionAfter | 文本 | 修改后版本 |
+| TriggeredByData | 长文本 | 触发数据描述 |
+| ProblemDetected | 长文本 | 发现的问题 |
+| ModuleChanged | 文本 | 修改的模块 |
+| RuleBefore | 长文本 | 修改前规则 |
+| RuleAfter | 长文本 | 修改后规则 |
+| ExpectedImprovement | 长文本 | 预期改善 |
+| ActionLevel | 数值 | 1/2/3 |
+| RollbackCondition | 长文本 | 回滚条件 |
+| Owner | 文本 | 负责人 |
+| Date | 日期 | 修改日期 |
+
+### VEL Table（可选扩展表）
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| PromptID | 文本 | 关联 Prompt |
+| VEL_Type | 文本 | A/B/C/D |
+| VEL_Content | 文本 | 具体增强词 |
+| VEL_Position | 文本 | 植入位置（第几句） |
+| VEL_RenderResult | 文本 | 有效/无效/堆叠/冲突 |
+| CreatedDate | 日期 | 创建日期 |
+
+### Annotation Table（可选扩展表）
+
+Annotation Table 记录每位标注者的独立评分，用于支持多标注者独立打分和分歧计算。
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| AnnotationID | 文本 | 标注唯一标识 |
+| VideoID | 文本 | 关联视频 |
+| AnnotatorID | 文本 | 标注者 |
+| RenderSuccess | 数值 | 2/1/0 |
+| VisualQuality | 数值 | 2/1/0 |
+| ProductVisibility | 数值 | 2/1/0 |
+| MotionAccuracy | 数值 | 2/1/0 |
+| FaceBodyStabilityScore | 数值 | 0/1/2 |
+| FaceBodyApplicable | 文本 | Yes/No |
+| AudioMatchScore | 数值 | 0/1/2 |
+| AudioApplicable | 文本 | Yes/No |
+| TextQualityScore | 数值 | 2/1/0 |
+| NoPostActual | 数值 | 3/2/1/0 |
+| HumanOverall | 数值 | 3/2/1/0 |
+| Notes | 长文本 | 标注备注 |
+| AnnotationDate | 日期 | 标注日期 |
+
+### Series Table（可选扩展表）
+
+仅在内容为系列/连载/EP/campaign 时使用。
+
+| 字段 | 类型 | 说明 |
+|:--|:--|:--|
+| SeriesID | 文本 | 系列唯一标识 |
+| SeriesName | 文本 | 系列名称 |
+| EpisodeNumber | 数值 | 集数 |
+| VideoID | 文本 | 关联视频 |
+| CharacterConsistency | 数值 | 0-5 |
+| WorldConsistency | 数值 | 0-5 |
+| VisualStyleConsistency | 数值 | 0-5 |
+| CTAConsistency | 数值 | 0-5 |
+| EmotionContinuity | 数值 | 0-5 |
+| SCScore | 数值 | 五项平均值，0-5 |
+| SeriesFollowRate | 数值 | 如有数据 |
+| Notes | 长文本 | 备注 |
+| CreatedDate | 日期 | 创建日期 |
+
+---
+
+## O2. 团队协作角色
+
+| 角色 | 职责 |
+|:--|:--|
+| Creative Operator | 输入产品信息，运行 Creative Compiler，生成候选 Prompt |
+| Render Reviewer | 观看 HappyHorse 输出视频，完成标注 |
+| Ad Tester | 小预算投放和数据记录 |
+| Calibration Owner | 判断是否修改 Prompt、投放资产或 Kernel 规则 |
+
+如果是个人项目，可以一个人承担所有角色，但表格字段不能省略。
+
+---
+
+## O3. 发布等级
+
+| 等级 | 名称 | 条件 | 可以宣称 |
+|:--|:--|:--|:--|
+| Level 0 | Prompt Prototype | 只有 Prompt，无真实数据 | 结构化创意生成与专家先验评分系统 |
+| Level 1 | Render Validated | ≥30 条生成，RenderSuccess≥80%，PRC 一致率≥70% | 经过渲染回测的创意编译系统 |
+| Level 2 | NoPost Validated | DirectReady+LightEdit≥70%，Reject≤15%，NoPostGate 一致率≥70% | 经过 NoPost 验证的直接发布系统 |
+| Level 3 | Ad Signal Validated | Q1/Q8 高低分组差异显著 | 具备投放信号区分能力的评分系统 |
+| Level 4 | Calibration Ready | 至少一轮数据校准，所有 Kernel 修改有数据依据 | 经过数据校准的创意评估系统 |
+
+仍然不能称为：投放效果预测系统。
+
+---
+
+## O4. 版本治理
+
+版本命名：v2.0.1 / v2.0.1-r1 / v2.0.1-r2 ...
+
+每个版本必须记录 8 项：修改日期、修改原因、修改模块、修改前规则、修改后规则、触发数据、预期改善、是否需要回滚。
+
+禁止事项：
+1. 不允许因为单条视频失败就修改 Kernel。
+2. 不允许因为单个产品表现好就宣称系统有效。
+3. 不允许没有数据就修改权重。
+4. 不允许将专家评分说成预测模型。
+5. 不允许忽略失败样本。
+
+---
+
+## O5. Decision Dashboard：每轮测试输出
+
+每轮测试结束后必须输出以下 15 项：
+
+1. 测试产品数
+2. 生成视频数
+3. RenderSuccess 比例
+4. DirectReady 比例
+5. LightEdit 比例
+6. Reject 比例
+7. PRC_Pre / PRC_Actual 一致率
+8. NoPostGate_Pre / NoPostActual 一致率
+9. Q1 高低分组 ThreeSecondViewRate 差异
+10. Q8 高低分组 CompletionRate / RewatchRate 差异
+11. 最常见失败类型 Top 5
+12. 需要校准模块 Top 5
+13. 本轮校准动作
+14. 是否进入下一发布等级
+15. 下一轮测试建议
+
+---
+
+# 附录
+
+---
+
+## A1. Anti-Pseudoscience 声明
+
+1. 所有权重均为专家先验，不是训练得到的参数。
+2. StructureScore 不预测 CTR、CVR、ROI、销量或平台分发。
+3. HeuristicUncertainty 不是统计置信区间。
+4. G_market 是文化适配启发式，不代表平台分发概率。
+5. NoPostGate 只评估完全不后期的可行性，不保证无需修正。
+6. PostReady 只评估标准后期兜底后的可交付性，不保证投放效果。
+7. Q8 EmotionalImpact 的子特征判定存在主观性，不同运行可能给出 ±1 浮动。
+8. EAD 情绪类型枚举可能不覆盖所有内容类型。
+9. PRC 的 KVS 识别和置信度分级依赖人工标注，需要 HappyHorse 实际渲染数据校准。
+10. SeriesCoherence 仅评估系列内部递进，不评估与外部内容的竞争差异化。
+11. 只有在接入 ≥30 条同品类同市场投放数据并完成回归校准后，才允许讨论预测关系。
+12. 有限终止证明保证流程在有限步骤内返回，不保证全局最优。
+13. 若 HappyHorse 模型更新，Q7、铁律、PRC 参数需重新校准。
+14. VEL 增强词的实际渲染效果取决于 HappyHorse 1.0 的渲染引擎精度，需实测数据校准。
+15. HappyHorse 音视频联合生成的音频质量、对白精确度、音效自然度均需平台实测数据校准。
+
+---
+
+## A2. 版本历史
+
+| 版本 | 核心变更 |
+|:--|:--|
+| v1.0 | 完整规范文档：18 条铁律 + Q1-Q8 子特征 + StructureScore 精算链 + VEL + PRC/EAD/SC + NoPostGate/PostReady + 14 步验算 + PS-4 校准接口 |
+| v1.7-Final | 精算编译器：三层架构 + Q8 严格判定 + 正反例 + NoPostRiskLoad 恢复 + Cap Rules 连续值 + PostReadyScore + PS-4 完整阈值 + 14 步 14/14 |
+| v1.8-Eval | 实验协议：Render Test + NoPost Audit + Small Batch Ad Test + Calibration Sheet + Release Gate |
+| v1.9-Bench | 评测工作台：Test Set Design + Annotation Rubric + Error Taxonomy + Metric Mapping + Calibration Matrix + Calibration Action Levels + Version Governance + Dashboard |
+| v2.0 | 创意操作系统：7 模块 + 6 张数据库表 + 4 角色 + Level 0-4 发布等级 + 自动校准规则 + 版本治理 |
+| **v2.0.1** | **系统规范定稿：修正铁律编号错位、P_penalty 正负号、动态权重冲突、K22 未定义变量、四元公式模式分叉；新增 VEL/Annotation/Series 三张可选扩展表；统一字段命名（ThreeSecondViewRate / TextQualityScore / FaceBodyStabilityScore / AudioMatchScore）；操作化 Release Gate 判定标准；补充 VEL/音频/SC 校准规则；明确 SCScore 定义、AudioMatchScore 统计范围、Q1/Q8 样本量兜底、NoPostRiskLoad 离散化口径、RenderResult 与 Annotation 职责边界、V2V 禁止误改项。** |
+
+---
+
+## A3. 一句话定位
+
+```
+HappyHorse CreativeOS v2.0.1
+= 把产品卖点编译成可生成、可评分、可审计、可回测、可归因、可校准、可持续进化的 AI 视频广告系统。
+```
+
+---
+
+**HappyHorse CreativeOS v2.0.1 — 系统规范定稿。**
