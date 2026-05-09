@@ -1,4 +1,4 @@
-# Seedance Prompt 生成系统 v3.5
+# Seedance 2.0 TikTok Growth Prompt Compiler v3.5
 
 ## Creative Quality + Visual Enhancement + NoPost Delivery Compiler — Complete Spec
 
