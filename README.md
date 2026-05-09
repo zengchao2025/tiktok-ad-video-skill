@@ -64,7 +64,7 @@ tiktok-ad-video-skill/
 │   Q1–Q8 评分、StructureScore、双门控、14 步审计、校准矩阵、
 │   Pilot 执行指南、数据库建表，共 12 篇完整规范。
 │
-├── Seedance 2.0 TikTok Growth Prompt Compiler v3.5.md                            # 【Seedance 专用编译器 v3.5】
+├── Seedance 2.0 TikTok Growth Prompt Compiler v3.5.md      # 【Seedance 专用编译器 v3.5】
 │   涵盖：6 步增强植入流程、VEL 四层架构、动态降级表、
 │   双门控自动化判断、Seedance 完整 Prompt 输出格式、
 │   投放标题 ABC / 标签 / 置顶评论 / Bio CTA 等全链路交付资产。
