@@ -31,7 +31,7 @@
 - **通用平台 / 标准流程**（HappyHorse / 大多数文生视频工具）  
   → 复制 `HappyHorse CreativeOS v2.1-MVP.md` 的全部内容。
 - **需要 Seedance 格式资产输出**（Seedance 2.0）  
-  → 复制 `Seedance.md` 的全部内容。
+  → 复制 `Seedance 2.0 TikTok Growth Prompt Compiler v3.5.md` 的全部内容。
 
 ### 2. 丢给 AI
 把上面选好的文档内容完整粘贴到 DeepSeek / ChatGPT / Claude 等的对话框中，再附上这句话：
@@ -64,7 +64,7 @@ tiktok-ad-video-skill/
 │   Q1–Q8 评分、StructureScore、双门控、14 步审计、校准矩阵、
 │   Pilot 执行指南、数据库建表，共 12 篇完整规范。
 │
-├── Seedance.md                            # 【Seedance 专用编译器 v3.5】
+├── Seedance 2.0 TikTok Growth Prompt Compiler v3.5.md                            # 【Seedance 专用编译器 v3.5】
 │   涵盖：6 步增强植入流程、VEL 四层架构、动态降级表、
 │   双门控自动化判断、Seedance 完整 Prompt 输出格式、
 │   投放标题 ABC / 标签 / 置顶评论 / Bio CTA 等全链路交付资产。
