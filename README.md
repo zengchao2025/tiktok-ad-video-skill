@@ -122,7 +122,6 @@ Product Table（产品主表）
 ## 🚀 快速开始（使用 HappyHorse CreativeOS）
 
 > HappyHorse CreativeOS 是一套**规则驱动系统**，你可以将它作为“专家先验”创意编译器，通过 **DeepSeek 等支持长上下文的 LLM** 来执行 Prompt 生成、评分与 Pilot 投放管理。  
-> **完整操作手册、分步指令与防坑指南请查阅 [USAGE.md](./USAGE.md)。**
 
 ### 工作原理（三层投喂法）
 
