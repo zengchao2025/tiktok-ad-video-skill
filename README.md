@@ -151,4 +151,3 @@ tiktok-ad-video-skill/
 本项目基于 [MIT License](LICENSE) 开源。
 
 Copyright © 2024 qq547820639
-```
